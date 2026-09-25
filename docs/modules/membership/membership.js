@@ -1002,7 +1002,8 @@
     const modal = document.getElementById('member-modal');
     if (modal) {
       modal.addEventListener('click', (e) => {
-        if (e.target === modal || e.target.closest('[data-close-member-modal]')) closeMemberModal();
+        // إلغاء الإغلاق عند backdrop - فقط X أو إلغاء
+        if (e.target.closest('[data-close-member-modal]')) closeMemberModal();
       });
     }
     const saveBtn = document.getElementById('btn-save-member');
@@ -1253,10 +1254,16 @@
 
   function bindQuickEmployerModal() {
     const modal = document.getElementById('quick-employer-modal');
-    if (!modal || modal.dataset.tripleBound === '1') return;
+    if (!modal) {
+      console.warn('[Baraka] quick-employer-modal not found');
+      return;
+    }
+    if (modal.dataset.tripleBound === '1') return;
     modal.dataset.tripleBound = '1';
+    console.log('[Baraka] bindQuickEmployerModal called');
     modal.addEventListener('click', (e) => {
-      if (e.target === modal || e.target.closest('[data-close-quick-employer-modal]')) closeQuickEmployerModal();
+      // الخيار A: الإغلاق فقط عند زر X أو إلغاء، لا عند backdrop
+      if (e.target.closest('[data-close-quick-employer-modal]')) closeQuickEmployerModal();
     });
     const saveBtn = document.getElementById('btn-save-quick-employer');
     if (saveBtn) saveBtn.addEventListener('click', saveQuickEmployer);
@@ -1266,10 +1273,23 @@
   }
 
   function bindQuickEmployerTrigger() {
+    console.log('[Baraka] bindQuickEmployerTrigger called');
     const btn = document.getElementById('btn-quick-add-employer');
-    if (!btn || btn.dataset.tripleTriggerBound === '1') return;
+    if (!btn) {
+      console.warn('[Baraka] btn-quick-add-employer not found in DOM');
+      return;
+    }
+    if (btn.dataset.tripleTriggerBound === '1') {
+      console.log('[Baraka] bindQuickEmployerTrigger already bound, skipping');
+      return;
+    }
     btn.dataset.tripleTriggerBound = '1';
-    btn.addEventListener('click', openQuickEmployerModal);
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      console.log('[Baraka] + جهة clicked, opening quick modal');
+      openQuickEmployerModal();
+    });
+    console.log('[Baraka] bindQuickEmployerTrigger bound successfully');
   }
 
   /* ═══════════════════════════════════════════════
@@ -1337,6 +1357,10 @@
 
     toggleEmployerField();
     setVal('member-employer', data && data.employer_id ? data.employer_id : '');
+    // تأكيد الربط عند كل فتح للنافذة
+    try { bindQuickEmployerTrigger(); } catch (e) {}
+    try { bindQuickEmployerModal(); } catch (e) {}
+    try { bindMemberStatusListener(); } catch (e) {}
 
     document.getElementById('member-modal-title').textContent = MEMBER_EDIT.readOnly
       ? 'بيانات العضو'
@@ -2058,7 +2082,8 @@
       const modal = $(config.ids.modal);
       if (modal) {
         modal.addEventListener('click', (e) => {
-          if (e.target === modal || e.target.closest('[' + config.closeAttr + ']')) closeModal();
+          // الخيار A: إغلاق فقط عند زر X/إلغاء
+          if (e.target.closest('[' + config.closeAttr + ']')) closeModal();
         });
 
         const form = $(config.ids.form);
@@ -2990,7 +3015,7 @@
     if (modal && !modal.dataset.subsBackdropBound) {
       modal.dataset.subsBackdropBound = '1';
       modal.addEventListener('click', (e) => {
-        if (e.target === modal || e.target.closest('[data-close-sub-modal]')) closeSubModal();
+        if (e.target.closest('[data-close-sub-modal]')) closeSubModal();
       });
     }
 
@@ -3746,7 +3771,7 @@
     if (modal && !modal.dataset.batchBackdropBound) {
       modal.dataset.batchBackdropBound = '1';
       modal.addEventListener('click', (e) => {
-        if (e.target === modal || e.target.closest('[data-close-batch-modal]')) {
+        if (e.target.closest('[data-close-batch-modal]')) {
           closeBatchModal();
         }
       });
@@ -4027,6 +4052,29 @@
   bindDeductionEntities();
   bindSubs();
   bindBatches();
+  // تأكيد ربط زر + جهة ونافذة الجهة السريعة حتى لو فشل bindMembersFilters مبكرًا
+  try { bindMemberStatusListener(); } catch (e) { console.warn('[Baraka] bindMemberStatusListener error', e); }
+  try { bindQuickEmployerModal(); } catch (e) { console.warn('[Baraka] bindQuickEmployerModal error', e); }
+  try { bindQuickEmployerTrigger(); } catch (e) { console.warn('[Baraka] bindQuickEmployerTrigger error', e); }
+  // ربط نافذة bulk-batch-modal أيضًا
+  try {
+    const bulkModal = document.getElementById('bulk-batch-modal');
+    if (bulkModal && !bulkModal.dataset.bulkBound) {
+      bulkModal.dataset.bulkBound = '1';
+      bulkModal.addEventListener('click', (e) => {
+        if (e.target.closest('[data-close-bulk-batch]')) {
+          if (typeof closeBulkBatchModal === 'function') closeBulkBatchModal();
+          else bulkModal.classList.add('hidden');
+        }
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !bulkModal.classList.contains('hidden')) {
+          if (typeof closeBulkBatchModal === 'function') closeBulkBatchModal();
+          else bulkModal.classList.add('hidden');
+        }
+      });
+    }
+  } catch (e) { console.warn('[Baraka] bulk-batch bind error', e); }
 
   /* ═══════════════════════════════════════════════
      API عام للوحدات الفرعية
