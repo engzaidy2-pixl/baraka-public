@@ -407,7 +407,7 @@ function initLogin() {
     }
 
     /* نجاح: التوجيه إلى dashboard.html */
-    window.location.href = 'dashboard.html';
+   window.location.href = appPath('dashboard.html');
   });
 }
 

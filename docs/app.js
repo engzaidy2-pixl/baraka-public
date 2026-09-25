@@ -7,7 +7,7 @@
 
 const USER = currentUser();
 if (!USER && window.location.pathname.includes('dashboard')) {
-  window.location.replace('index.html');
+ window.location.replace(appPath('index.html'));
 }
 
 let activeTab = 'dashboard';
@@ -198,7 +198,7 @@ function bindModuleTabsEvents(moduleKey) {
 function showTab(key) {
   // ⭐ إعادة توجيه تبويب شؤون العضوية
   if (key === 'membership_affairs') {
-    window.location.href = 'modules/membership/membership.html';
+    window.location.href = appPath('modules/membership/membership.html');
     return;
   }
   

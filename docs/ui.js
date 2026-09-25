@@ -118,6 +118,18 @@ document.addEventListener('keydown', (e) => {
   document.querySelectorAll('.b-modal:not(.hidden)').forEach((m) => closeModal(m.id));
 });
 
+/**
+ * تحديد المسار المطلق من جذر المشروع
+ * @param {string} relativePath - مثل 'index.html' أو 'dashboard.html'
+ * @returns {string} - المسار الصحيح حسب موقع الصفحة الحالية
+ */
+function appPath(relativePath) {
+  const path = window.location.pathname;
+  if (path.includes('/modules/')) return '../../' + relativePath;
+  return relativePath;
+}
+
+
 /* ── تسجيل الخروج ── */
 async function logout() {
   B_STORE.del('baraka_b.session');
@@ -127,10 +139,7 @@ async function logout() {
     try { await sb.auth.signOut(); }
     catch (e) { console.warn('[Baraka] signOut failed:', e?.message || e); }
   }
-  /* تحديد مسار الصفحة الرئيسية حسب الموقع الحالي */
-  const path = window.location.pathname;
-  const rootPath = path.includes('/modules/') ? '../../index.html' : 'index.html';
-  window.location.href = rootPath;
+  window.location.href = appPath('index.html');
 }
 
 /* ── تصدير في بيئة Node (للاختبارات) مع الحفاظ على التوافق مع المتصفح ── */
@@ -142,6 +151,7 @@ if (typeof module !== 'undefined' && module.exports) {
     toast,
     openModal,
     closeModal,
+    appPath,
     logout,
   };
 }
