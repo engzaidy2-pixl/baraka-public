@@ -181,6 +181,10 @@ const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY';
 
 ## 📬 التواصل
 
+• العرض الحي: engzaidy2-pixl.github.io/baraka-public
+• Issues والاقتراحات: github.com/engzaidy2-pixl/baraka-public/issues
+• البريد الإلكتروني: Engzaidy2@gmail.com
+• المشرف:AlZaidy
 - **العرض الحي**: [engzaidy2-pixl.github.io/baraka-public](https://engzaidy2-pixl.github.io/baraka-public/)
 - **Issues**: [github.com/engzaidy2-pixl/baraka-public/issues](https://github.com/engzaidy2-pixl/baraka-public/issues)
 
