@@ -207,7 +207,7 @@
     /* 5. تحديث URL hash (للرجوع) */
     try { history.replaceState(null, '', `#${key}`); } catch (e) { /* تجاهل */ }
 
-    /* 6. تحميل بيانات لوحة التحكم عند عرضها (مع منع التكرار خلال مدة الصلاحية) */
+    /* 6. تحميل بيانات لوحة التحكم عند عرضها */
     if (key === 'dashboard') {
       const stale = !STATE.dashboardLoadedAt || (Date.now() - STATE.dashboardLoadedAt) > DASHBOARD_TTL;
       if (stale && !STATE.dashboardLoading) {
@@ -215,32 +215,30 @@
       }
     }
 
-    /* 7. تحميل بيانات الأعضاء عند عرض التبويب */
+    /* 7. تحميل بيانات الأعضاء */
     if (key === 'members') {
       loadMembers().catch((e) => console.error('[Baraka Membership] Members load error:', e));
     }
     
-    /* 7.1 تحميل الاشتراكات عند عرض التبويب */
+    /* 7.1 تحميل الاشتراكات */
     if (key === 'subscriptions') {
       loadSubscriptions().catch((e) => console.error('[Baraka Membership] Subscriptions load error:', e));
     }
 
-    /* 8. تحميل جهات العمل وجهات الخصم عند عرض التبويب */
+    /* 8. تحميل جهات العمل وجهات الخصم */
     if (key === 'employers') {
       loadEmployers().catch((e) => console.error('[Baraka Membership] Employers load error:', e));
     }
-     if (key === 'deduction-entities') {
+    if (key === 'deduction-entities') {
       loadDeductionEntities().catch((e) => console.error('[Baraka Membership] Deduction entities load error:', e));
     }
 
-    /* 9. تحميل دفعات الخصم عند عرض التبويب */
+    /* 9. تحميل دفعات الخصم */
     if (key === 'deductions') {
       loadBatches().catch((e) => console.error('[Baraka Membership] Batches load error:', e));
     }
   }
 
-
-  
   /* ═══════════════════════════════════════════════
      ربط الإجراءات السريعة في لوحة التحكم
      ═══════════════════════════════════════════════ */
@@ -262,6 +260,9 @@
       });
     });
   }
+
+// ⬇⬇⬇ يتبع في الدفعة 2 ⬇⬇⬇
+// ⬆⬆⬆ تكملة الدفعة 1 ⬆⬆⬆
 
   /* ═══════════════════════════════════════════════
      لوحة التحكم — تحميل البيانات من Supabase
@@ -285,23 +286,22 @@
 
       /* جلب متوازٍ — كل استعلام مستقل ولا يُسقط الباقي عند فشله */
       const results = await Promise.allSettled([
-        sb.from('members').select('id', { count: 'exact', head: true }),                                  // 0 إجمالي الأعضاء
-        sb.from('members').select('id', { count: 'exact', head: true }).eq('status', 'active'),           // 1 الأعضاء النشطون
+        sb.from('members').select('id', { count: 'exact', head: true }),
+        sb.from('members').select('id', { count: 'exact', head: true }).eq('status', 'active'),
         sb.from('subscriptions').select('id', { count: 'exact', head: true })
           .in('status', ['pending', 'partial'])
-          .eq('period_year', year).eq('period_month', month),                                             // 2 اشتراكات مستحقة (الشهر الحالي)
+          .eq('period_year', year).eq('period_month', month),
         sb.from('subscriptions').select('paid_amount')
           .in('status', ['paid', 'partial'])
-          .eq('period_year', year).eq('period_month', month),                                             // 3 المحصَّل هذا الشهر
-        sb.from('members').select('id', { count: 'exact', head: true }).eq('status', 'suspended'),        // 4 الأعضاء الموقوفون
-        sb.from('deduction_batches').select('id', { count: 'exact', head: true }).eq('status', 'draft'),  // 5 دفعات قيد الإعداد
+          .eq('period_year', year).eq('period_month', month),
+        sb.from('members').select('id', { count: 'exact', head: true }).eq('status', 'suspended'),
+        sb.from('deduction_batches').select('id', { count: 'exact', head: true }).eq('status', 'draft'),
         sb.from('members').select('full_name, member_number, created_at')
-          .order('created_at', { ascending: false }).limit(5),                                            // 6 أحدث الأعضاء
+          .order('created_at', { ascending: false }).limit(5),
         sb.from('deduction_batches').select('batch_number, total_amount, created_at')
-          .order('created_at', { ascending: false }).limit(5),                                            // 7 أحدث دفعات الخصم
+          .order('created_at', { ascending: false }).limit(5),
       ]);
 
-      /* قيمة نتيجة i ما لم تفشل/تُرفض */
       const val = (i, fallback = null) => (
         results[i].status === 'fulfilled' && !results[i].value.error
           ? results[i].value
@@ -431,7 +431,7 @@
   function renderDashboardError(message) {
     renderDashboardAlerts([{ icon: '⚠️', kind: 'danger', text: message }]);
     renderDashboardRecent([]);
-    STATE.dashboardLoadedAt = Date.now(); /* لا نعيد المحاولة فورًا عند كل تنقّل */
+    STATE.dashboardLoadedAt = Date.now();
   }
 
   /* ═══════════════════════════════════════════════
@@ -442,7 +442,7 @@
     if (el) el.textContent = text;
   }
 
-  /** تهريب HTML لمنع XSS عند عرض بيانات قاعدة البيانات */
+  /** تهريب HTML لمنع XSS */
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, (c) => (
       { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -463,7 +463,7 @@
     return `${formatted} ر.س`;
   }
 
-  /** الزمن النسبي بالعربية (قبل ساعتين، أمس...) */
+  /** الزمن النسبي بالعربية */
   function relTimeAr(isoDate) {
     if (!isoDate) return '';
     const then = new Date(isoDate);
@@ -476,7 +476,7 @@
     return rtf.format(-Math.round(diffSec / 86400), 'day');
   }
 
-  /** صفوف هيكلية متحركة أثناء التحميل */
+  /** صفوف هيكلية متحركة */
   function skeletonRows(count) {
     const widths = ['92%', '78%', '64%', '85%'];
     return Array.from({ length: count }, (_, i) =>
@@ -512,8 +512,11 @@
     }
   });
 
+// ⬇⬇⬇ يتبع في الدفعة 3 ⬇⬇⬇
+// ⬆⬆⬆ تكملة الدفعة 2 ⬆⬆⬆
+
   /* ═══════════════════════════════════════════════
-     تبويب الأعضاء (tab-members) — الحالة
+     تبويب الأعضاء — الحالة
      ═══════════════════════════════════════════════ */
   STATE.members = {
     list: [],
@@ -555,7 +558,6 @@
   let MEMBER_EDIT = { id: null, readOnly: false };
 
   /* ─ أدوات مساعدة ─ */
-
   function membersSb() {
     return (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
   }
@@ -765,8 +767,8 @@
       +   '<td data-label="إجراءات">'
       +     '<div class="member-actions">'
       +       '<button type="button" class="member-action" data-member-action="view"   data-member-id="' + id + '" title="عرض">👁</button>'
-      +       '<button type="button" class="member-action" data-sub-action="pay"    data-sub-id="' + id + '" title="تسجيل دفعة">💵</button>'
-              '<button type="button" class="member-action" data-member-action="edit"   data-member-id="' + id + '" title="تعديل">✏️</button>'
+      +       '<button type="button" class="member-action" data-sub-action="pay"      data-sub-id="' + id + '" title="تسجيل دفعة">💵</button>'
+      +       '<button type="button" class="member-action" data-member-action="edit"   data-member-id="' + id + '" title="تعديل">✏️</button>'
       +       '<button type="button" class="member-action" data-member-action="delete" data-member-id="' + id + '" title="حذف">🗑</button>'
       +     '</div>'
       +   '</td>'
@@ -898,6 +900,9 @@
 
     host.innerHTML = chips.join('');
   }
+
+// ⬇⬇⬇ يتبع في الدفعة 4 ⬇⬇⬇
+// ⬆⬆⬆ تكملة الدفعة 3 ⬆⬆⬆
 
   /* ═══════════════════════════════════════════════
      bindMembersFilters()
@@ -1397,6 +1402,9 @@
     }
   }
 
+// ⬇⬇⬇ يتبع في الدفعة 5 ⬇⬇⬇
+// ⬆⬆⬆ تكملة الدفعة 4 ⬆⬆⬆
+
   /* ═══════════════════════════════════════════════
      تبويبا جهات العمل وجهات الخصم — الحالة
      ═══════════════════════════════════════════════ */
@@ -1420,7 +1428,6 @@
     searchTimer: null,
   };
 
-  /* حالات جهات العمل / الخصم (حسب قيد CHECK في schema.sql) */
   const DIR_STATUS = {
     active:   { label: 'نشط',     cls: 'member-badge-active' },
     inactive: { label: 'غير نشط', cls: 'member-badge-hidden' },
@@ -1430,7 +1437,6 @@
     return DIR_STATUS[status] || { label: status || '—', cls: 'member-badge-hidden' };
   }
 
-  /** إبطال قوائم الخيارات في تبويب الأعضاء بعد أي إضافة/تعديل/حذف */
   function invalidateMembersOptions() {
     if (STATE.members) STATE.members.optionsLoaded = false;
   }
@@ -1440,13 +1446,9 @@
 
   /* ═══════════════════════════════════════════════
      مصنع موحَّد لإدارة تبويب "جهة"
-     (جهات العمل / جهات الخصم) — بحث + فلتر + جدول
-     + نافذة إضافة/تعديل + حذف. يعيد استخدام أدوات
-     وأنماط تبويب الأعضاء (members-*).
      ═══════════════════════════════════════════════ */
   function createDirectoryTab(config) {
     const st = config.state;
-
     const $ = (id) => document.getElementById(id);
 
     const val = (id) => {
@@ -1454,7 +1456,6 @@
       return el ? String(el.value || '').trim() : '';
     };
 
-    /* ربط حقول النافذة بأعمدة قاعدة البيانات */
     const fieldBindings = [
       { id: config.ids.nameInput,  key: 'name' },
       { id: config.inputs.code,    key: 'code' },
@@ -1468,7 +1469,6 @@
       return Boolean(st.filters.q || st.filters.status);
     }
 
-    /* ── load — جلب القائمة كاملة (القوائم صغيرة والتصفية محلية) ── */
     async function load() {
       const sb = membersSb();
 
@@ -1510,7 +1510,6 @@
       }
     }
 
-    /* ── التصفية المحلية (بحث + فلتر الحالة) ── */
     function filteredList() {
       const term = normalizeHeader(st.filters.q);
 
@@ -1524,7 +1523,6 @@
       });
     }
 
-    /* ── العرض ── */
     function renderAll() {
       renderTable();
       renderMeta();
@@ -1596,7 +1594,6 @@
       host.innerHTML = chips.join('');
     }
 
-    /* ── البحث الفوري (بتأخير 300ms) والفلاتر ── */
     function search(value, immediate) {
       const term = String(value || '').trim();
 
@@ -1628,7 +1625,6 @@
       renderAll();
     }
 
-    /* ── نافذة إضافة / تعديل ── */
     function openModal(id) {
       const modal = $(config.ids.modal);
       if (!modal) return;
@@ -1661,7 +1657,6 @@
       st.editId = null;
     }
 
-    /* ── حفظ (إضافة / تعديل) ── */
     async function save() {
       const sb = membersSb();
       if (!sb) { if (typeof toast === 'function') toast('لا يوجد اتصال بقاعدة البيانات', 'error'); return; }
@@ -1718,7 +1713,6 @@
       }
     }
 
-    /* ── حذف ── */
     async function remove(id) {
       const record = st.list.find((r) => Number(r.id) === Number(id));
       if (!record) return;
@@ -1745,7 +1739,6 @@
       }
     }
 
-    /* ── ربط الأحداث ── */
     function onTableClick(e) {
       const btn = e.target.closest('[' + config.actionAttr + ']');
       if (!btn) return;
@@ -1804,7 +1797,6 @@
       const tbody = $(config.ids.tbody);
       if (tbody) tbody.addEventListener('click', onTableClick);
 
-      /* زر "إضافة أول جهة" داخل الحالة الفارغة */
       section.addEventListener('click', (e) => {
         if (e.target.closest('[' + config.actionAttr + '="add"]')) openModal(null);
       });
@@ -1862,7 +1854,6 @@
       + '</tr>';
   }
 
-  /* ── تهيئة تبويب جهات العمل ── */
   const EmployersTab = createDirectoryTab({
     table: 'employers',
     sectionId: 'tab-employers',
@@ -1920,9 +1911,6 @@
     rowHtml: employerRowHtml,
   });
 
-  /* ═══════════════════════════════════════════════
-     واجهات تبويب جهات العمل
-     ═══════════════════════════════════════════════ */
   function renderEmployersTable()   { return EmployersTab.renderTable(); }
   function searchEmployers(v, imm)  { return EmployersTab.search(v, imm); }
   function setEmployerFilter(k, v)  { return EmployersTab.setFilter(k, v); }
@@ -1968,7 +1956,6 @@
       + '</tr>';
   }
 
-  /* ── تهيئة تبويب جهات الخصم ── */
   const EntitiesTab = createDirectoryTab({
     table: 'deduction_entities',
     sectionId: 'tab-deduction-entities',
@@ -2026,9 +2013,6 @@
     rowHtml: entityRowHtml,
   });
 
-  /* ═══════════════════════════════════════════════
-     واجهات تبويب جهات الخصم
-     ═══════════════════════════════════════════════ */
   function renderDeductionEntitiesTable() { return EntitiesTab.renderTable(); }
   function searchDeductionEntities(v, imm) { return EntitiesTab.search(v, imm); }
   function setEntityFilter(k, v)       { return EntitiesTab.setFilter(k, v); }
@@ -2039,11 +2023,11 @@
   function deleteEntity(id)            { return EntitiesTab.remove(id); }
   function bindDeductionEntities()     { return EntitiesTab.bind(); }
 
-    /* ═══════════════════════════════════════════════
-     الاشتراكات — التحميل والعرض فقط
-     (tab-subscriptions: جلب + جدول + ملخص + ترقيم)
-     لا يشمل النافذة (modal) ولا ربط الفلاتر التفاعلي —
-     تُضاف لاحقًا في مهمة مستقلة.
+// ⬇⬇⬇ يتبع في الدفعة 6 ⬇⬇⬇
+// ⬆⬆⬆ تكملة الدفعة 5 ⬆⬆⬆
+
+  /* ═══════════════════════════════════════════════
+     الاشتراكات — التحميل والعرض
      ═══════════════════════════════════════════════ */
   STATE.subscriptions = {
     list: [],
@@ -2413,7 +2397,7 @@
 
   bindSubsPagination();
 
-    /* ═══════════════════════════════════════════════
+  /* ═══════════════════════════════════════════════
      نافذة إضافة / تعديل / حذف الاشتراك
      ═══════════════════════════════════════════════ */
   let SUB_EDIT = { id: null, readOnly: false };
@@ -2757,11 +2741,11 @@
 
   bindSubsModal();
 
-      /* ═══════════════════════════════════════════════
+// ⬇⬇⬇ يتبع في الدفعة 7 ⬇⬇⬇
+// ⬆⬆⬆ تكملة الدفعة 6 ⬆⬆⬆
+
+  /* ═══════════════════════════════════════════════
      دفعات الخصم — التحميل والعرض
-     (tab-deductions: جلب + جدول 9 أعمدة + ملخص + ترقيم)
-     لا يشمل نافذة الدفعة (batch-modal) ولا الإجراء التجميعي
-     ولا التصدير — تُضاف لاحقًا في مهمة مستقلة.
      ═══════════════════════════════════════════════ */
   STATE.deductionBatches = {
     list: [],
@@ -2775,7 +2759,6 @@
     summary: { total: 0, deduction: 0, cash: 0, amount: 0 },
   };
 
-  /** نفس أشهر الاشتراكات — نسخة مستقلة باسم الدفعة لسهولة التطوير */
   const BATCH_MONTHS_AR = SUB_MONTHS_AR;
 
   const BATCH_STATUS = {
@@ -2785,7 +2768,6 @@
     cancelled: 'ملغاة',
   };
 
-  /** شارات الحالة — تعيد استخدام أنماط الشارات الموجودة فقط */
   const BATCH_STATUS_BADGE = {
     draft:     'member-badge-suspended',
     sent:      'badge-info',
@@ -2821,9 +2803,6 @@
     return Boolean(f.q || f.period_year || f.period_month || f.payment_method || f.status);
   }
 
-  /* ═══════════════════════════════════════════════
-     loadBatches() — الجلب + الترقيم
-     ═══════════════════════════════════════════════ */
   async function loadBatches() {
     const sb = membersSb();
     const s  = STATE.deductionBatches;
@@ -2915,9 +2894,6 @@
     return query;
   }
 
-  /* ═══════════════════════════════════════════════
-     renderBatchesTable()
-     ═══════════════════════════════════════════════ */
   function renderBatchesTable() {
     const tbody = document.getElementById('batches-tbody');
     if (!tbody) return;
@@ -3001,9 +2977,6 @@
     if (empty) empty.hidden = false;
   }
 
-  /* ═══════════════════════════════════════════════
-     renderBatchesSummary() — 4 بطاقات
-     ═══════════════════════════════════════════════ */
   function renderBatchesSummary() {
     const s = STATE.deductionBatches;
 
@@ -3033,9 +3006,6 @@
     setText('batches-sum-amount',    fmtMoney(amount));
   }
 
-  /* ═══════════════════════════════════════════════
-     renderBatchesPagination() — يعيد استخدام pageBtn + membersPageWindow
-     ═══════════════════════════════════════════════ */
   function renderBatchesPagination() {
     const host = document.getElementById('batches-pagination');
     if (!host) return;
@@ -3085,10 +3055,6 @@
     host.addEventListener('click', onBatchesPaginationClick);
   }
 
-  /* ═══════════════════════════════════════════════
-     renderBatchesMeta() + الفلاتر النشطة
-     (شريط .members-meta اختياري — لا شيء يحدث إن غاب)
-     ═══════════════════════════════════════════════ */
   function renderBatchesMeta() {
     const el = document.getElementById('batches-count');
     if (!el) return;
@@ -3131,11 +3097,6 @@
     host.innerHTML = chips.join('');
   }
 
-  /* ═══════════════════════════════════════════════
-     البحث + الفلاتر
-     ═══════════════════════════════════════════════ */
-
-  /* searchBatches() — بحث فوري في رقم الدفعة (debounce 300ms) */
   function searchBatches(value, immediate) {
     const term = String(value || '').trim();
 
@@ -3150,14 +3111,12 @@
     else STATE.deductionBatches.searchTimer = setTimeout(run, 300);
   }
 
-  /* setBatchFilter() — تغيير فلتر واحد */
   function setBatchFilter(key, value) {
     STATE.deductionBatches.filters[key] = (value === null || value === undefined) ? '' : String(value);
     STATE.deductionBatches.page = 1;
     loadBatches();
   }
 
-  /* resetBatchesFilters() — تصفير البحث + الفلاتر + الـ DOM */
   function resetBatchesFilters() {
     const s = STATE.deductionBatches;
     s.filters = { q: '', period_year: '', period_month: '', payment_method: '', status: '' };
@@ -3175,7 +3134,23 @@
     loadBatches();
   }
 
-  /* bindBatches() — ربط التبويب (مرة واحدة) */
+  /* ═══════════════════════════════════════════════
+     الإجراء التجميعي (bulk batch) — تنفيذ مؤقت
+     حتى المهمة 7.5. الدوال موجودة لتفادي ReferenceError
+     عند الربط، وتُستبدل لاحقًا بالتنفيذ الفعلي.
+     ═══════════════════════════════════════════════ */
+  function openBulkBatchModal() {
+    if (typeof toast === 'function') toast('الإجراء التجميعي قيد الإنشاء — قريبًا', 'info');
+  }
+
+  function closeBulkBatchModal() {
+    /* لا شيء حاليًا — يُستبدل لاحقًا بإغلاق النافذة */
+  }
+
+  function executeBulkBatch() {
+    if (typeof toast === 'function') toast('تنفيذ الدفعة التجميعية قيد الإنشاء — قريبًا', 'info');
+  }
+
   function bindBatches() {
     const section = document.getElementById('tab-deductions');
     if (!section || section.dataset.batchesBound) return;
@@ -3218,28 +3193,24 @@
     const resetBtn = document.getElementById('btn-reset-batches-filters');
     if (resetBtn) resetBtn.addEventListener('click', resetBatchesFilters);
 
-    /* الإجراء التجميعي — مؤقتًا حتى المهمة 7.5 */
     const bulkBtn = document.getElementById('btn-bulk-batch');
-    if (bulkBtn) {
-      bulkBtn.addEventListener('click', () => toast('الإجراء التجميعي قيد الإنشاء', 'info'));
+    if (bulkBtn && !bulkBtn.dataset.bulkBatchOpenBound) {
+      bulkBtn.dataset.bulkBatchOpenBound = '1';
+      bulkBtn.addEventListener('click', openBulkBatchModal);
     }
 
-    /* تصدير — مؤقتًا حتى المهمة 7.6 */
     const exportBtn = document.getElementById('btn-export-batches');
     if (exportBtn) {
       exportBtn.addEventListener('click', () => toast('تصدير الدفعات قيد الإنشاء', 'info'));
     }
 
-    /* ربط النافذة (يتضمن: زر الإضافة + الحالة الفارغة + الجدول + الحفظ + Escape) */
     bindBatchModal();
-
-    /* الترقيم */
     bindBatchesPagination();
   }
 
   bindBatchesPagination();
 
-    STATE.deductionBatches.entitiesOptions = [];
+  STATE.deductionBatches.entitiesOptions = [];
   STATE.deductionBatches.entitiesOptionsLoaded = false;
 
   /* ═══════════════════════════════════════════════
@@ -3425,14 +3396,9 @@
     setVal('batch-number', data ? data.batch_number || '' : '');
     setVal('batch-year', data ? data.period_year : now.getFullYear());
     setVal('batch-month', data ? data.period_month : now.getMonth() + 1);
-    setVal(
-      'batch-method',
-      data ? data.payment_method || 'salary_deduction' : 'salary_deduction'
-    );
-    setVal(
-      'batch-entity',
-      data ? data.deduction_entity_id || '' : ''
-    );
+    setVal('batch-method',
+      data ? data.payment_method || 'salary_deduction' : 'salary_deduction');
+    setVal('batch-entity', data ? data.deduction_entity_id || '' : '');
     setVal('batch-status', data ? data.status || 'draft' : 'draft');
     setVal('batch-notes', data ? data.notes || '' : '');
 
@@ -3457,12 +3423,8 @@
     }
 
     document
-      .querySelectorAll(
-        '#batch-form input, #batch-form select, #batch-form textarea'
-      )
-      .forEach((el) => {
-        el.disabled = BATCH_EDIT.readOnly;
-      });
+      .querySelectorAll('#batch-form input, #batch-form select, #batch-form textarea')
+      .forEach((el) => { el.disabled = BATCH_EDIT.readOnly; });
 
     const saveBtn = document.getElementById('btn-save-batch');
     if (saveBtn) saveBtn.hidden = BATCH_EDIT.readOnly;
@@ -3481,14 +3443,9 @@
 
   function closeBatchModal() {
     const modal = document.getElementById('batch-modal');
-
     if (modal) modal.classList.add('hidden');
 
-    BATCH_EDIT = {
-      id: null,
-      readOnly: false,
-      row: null,
-    };
+    BATCH_EDIT = { id: null, readOnly: false, row: null };
   }
 
   function onBatchesTableClick(e) {
@@ -3500,13 +3457,8 @@
 
     const action = btn.dataset.batchAction;
 
-    if (action === 'view') {
-      openBatchModal(id, { readOnly: true });
-    }
-
-    if (action === 'edit') {
-      openBatchModal(id);
-    }
+    if (action === 'view') openBatchModal(id, { readOnly: true });
+    if (action === 'edit') openBatchModal(id);
   }
 
   function bindBatchModal() {
@@ -3518,16 +3470,12 @@
     }
 
     const addBtn = document.getElementById('btn-add-batch');
-
     if (addBtn && !addBtn.dataset.batchAddBound) {
       addBtn.dataset.batchAddBound = '1';
       addBtn.addEventListener('click', () => openBatchModal(null));
     }
 
-    const emptyAdd = document.querySelector(
-      '#batches-empty [data-batch-action="add"]'
-    );
-
+    const emptyAdd = document.querySelector('#batches-empty [data-batch-action="add"]');
     if (emptyAdd && !emptyAdd.dataset.batchEmptyBound) {
       emptyAdd.dataset.batchEmptyBound = '1';
       emptyAdd.addEventListener('click', () => openBatchModal(null));
@@ -3537,12 +3485,8 @@
 
     if (modal && !modal.dataset.batchBackdropBound) {
       modal.dataset.batchBackdropBound = '1';
-
       modal.addEventListener('click', (e) => {
-        if (
-          e.target === modal
-          || e.target.closest('[data-close-batch-modal]')
-        ) {
+        if (e.target === modal || e.target.closest('[data-close-batch-modal]')) {
           closeBatchModal();
         }
       });
@@ -3550,20 +3494,14 @@
 
     if (!document.body.dataset.batchEscapeBound) {
       document.body.dataset.batchEscapeBound = '1';
-
       document.addEventListener('keydown', (e) => {
-        if (
-          e.key === 'Escape'
-          && modal
-          && !modal.classList.contains('hidden')
-        ) {
+        if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
           closeBatchModal();
         }
       });
     }
 
     const saveBtn = document.getElementById('btn-save-batch');
-
     if (saveBtn && !saveBtn.dataset.batchSaveBound) {
       saveBtn.dataset.batchSaveBound = '1';
       saveBtn.addEventListener('click', saveBatch);
@@ -3572,11 +3510,7 @@
 
   async function saveBatch() {
     const sb = membersSb();
-
-    if (!sb) {
-      toast('لا يوجد اتصال بقاعدة البيانات', 'error');
-      return;
-    }
+    if (!sb) { toast('لا يوجد اتصال بقاعدة البيانات', 'error'); return; }
 
     const value = (id) => {
       const el = document.getElementById(id);
@@ -3584,13 +3518,11 @@
     };
 
     const errorEl = document.getElementById('batch-form-error');
-
     const fail = (message) => {
       if (errorEl) {
         errorEl.textContent = message;
         errorEl.hidden = false;
       }
-
       toast(message, 'error');
     };
 
@@ -3639,9 +3571,7 @@
       if (result.error) throw result.error;
 
       toast(
-        BATCH_EDIT.id
-          ? 'تم تعديل الدفعة بنجاح'
-          : 'تم حفظ الدفعة بنجاح',
+        BATCH_EDIT.id ? 'تم تعديل الدفعة بنجاح' : 'تم حفظ الدفعة بنجاح',
         'success'
       );
 
@@ -3649,7 +3579,6 @@
       await loadBatches();
     } catch (e) {
       console.error('[Baraka Membership] saveBatch error:', e);
-
       fail(
         e && e.code === '23505'
           ? 'رقم الدفعة مستخدم مسبقًا.'
@@ -3660,12 +3589,10 @@
 
   bindBatchModal();
 
-  
   /* ═══════════════════════════════════════════════
      ربط البحث والفلاتر — تبويب الاشتراكات
      ═══════════════════════════════════════════════ */
 
-  /* searchSubs() — بحث فوري مع debounce 300ms */
   function searchSubs(value, immediate) {
     const term = String(value || '').trim();
 
@@ -3680,14 +3607,12 @@
     else STATE.subscriptions.searchTimer = setTimeout(run, 300);
   }
 
-  /* setSubFilter() — تغيير فلتر واحد */
   function setSubFilter(key, value) {
     STATE.subscriptions.filters[key] = (value === null || value === undefined) ? '' : String(value);
     STATE.subscriptions.page = 1;
     loadSubscriptions();
   }
 
-  /* resetSubsFilters() — تصفير البحث + الفلاتر + الـ DOM */
   function resetSubsFilters() {
     const s = STATE.subscriptions;
     s.filters = { q: '', period_year: '', period_month: '', status: '', payment_method: '' };
@@ -3704,7 +3629,7 @@
     renderSubsActiveFilters();
     loadSubscriptions();
   }
-  /* fetchSubsForExport() — مثل fetchSubsPage لكن دون ترقيم */
+
   async function fetchSubsForExport() {
     const s = STATE.subscriptions;
     const sb = membersSb();
@@ -3729,8 +3654,6 @@
     return { list: data || [] };
   }
 
-  
-  /* exportSubsExcel() — يصدِّر كل الصفوف المفلترة حاليًا */
   async function exportSubsExcel() {
     if (typeof XLSX === 'undefined') {
       toast('مكتبة Excel غير محمّلة — أعد تحميل الصفحة', 'error');
@@ -3784,8 +3707,6 @@
     }
   }
 
-
-  /* bindSubs() — ربط كامل التبويب (مرة واحدة) */
   function bindSubs() {
     const section = document.getElementById('tab-subscriptions');
     if (!section || section.dataset.subsBound) return;
@@ -3828,15 +3749,19 @@
     const resetBtn = document.getElementById('btn-reset-subs-filters');
     if (resetBtn) resetBtn.addEventListener('click', resetSubsFilters);
 
-    const bulkBtn = document.getElementById('btn-bulk-sub');
-    if (bulkBtn) bulkBtn.addEventListener('click', () => toast('الإجراء التجميعي قيد الإنشاء', 'info'));
+    const bulkBtn = document.getElementById('btn-bulk-batch');
+    if (bulkBtn && !bulkBtn.dataset.bulkBatchOpenBound) {
+      bulkBtn.dataset.bulkBatchOpenBound = '1';
+      bulkBtn.addEventListener('click', openBulkBatchModal);
+    }
 
     const exportBtn = document.getElementById('btn-export-subs');
     if (exportBtn) exportBtn.addEventListener('click', exportSubsExcel);
   }
 
-  
-  /* ربط الفلاتر فور تحميل DOM */
+  /* ═══════════════════════════════════════════════
+     ربط الفلاتر فور تحميل DOM
+     ═══════════════════════════════════════════════ */
   bindMembersFilters();
   bindEmployers();
   bindDeductionEntities();
@@ -3897,7 +3822,9 @@
     setBatchFilter,
     resetBatchesFilters,
     goToBatchesPage,
-    /* ─ تبويب جهات العمل ─ */
+    openBulkBatchModal,
+    closeBulkBatchModal,
+    executeBulkBatch,
 
     /* ─ تبويب جهات العمل ─ */
     loadEmployers,
@@ -3938,3 +3865,4 @@
     init();
   }
 })();
+// ═══════════ نهاية الملف ═══════════

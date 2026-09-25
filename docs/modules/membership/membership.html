@@ -1277,6 +1277,64 @@
               </div>
             </div>
           </div>
+                    <!-- ═══ نافذة الإجراء التجميعي ═══ -->
+          <div id="bulk-batch-modal" class="membership-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="bulk-batch-modal-title">
+            <div class="membership-modal" style="max-width: 36rem;">
+              <div class="membership-modal-header">
+                <h3 class="membership-modal-title" id="bulk-batch-modal-title">إجراء تجميعي</h3>
+                <button type="button" class="membership-btn membership-btn-outline membership-btn-sm" data-close-bulk-batch aria-label="إغلاق">✕</button>
+              </div>
+
+              <div class="membership-modal-body">
+                <form id="bulk-batch-form" class="member-form" novalidate>
+                  <div class="member-form-grid">
+                    <div class="member-field">
+                      <label class="membership-label" for="bulk-year">السنة <span class="required">*</span></label>
+                      <select id="bulk-year" class="membership-input"></select>
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="bulk-month">الشهر <span class="required">*</span></label>
+                      <select id="bulk-month" class="membership-input"></select>
+                    </div>
+
+                    <div class="member-field member-field-full">
+                      <label class="membership-label" for="bulk-scope">نطاق التنفيذ</label>
+                      <select id="bulk-scope" class="membership-input">
+                        <option value="all">الكل (موظفون + معاش)</option>
+                        <option value="employees">الموظفون فقط (دفعات خصم)</option>
+                        <option value="pension">المعاش/خارج الخدمة فقط (مطالبات نقدية)</option>
+                      </select>
+                      <span class="membership-hint">يولّد اشتراكات + دفعات لكل الفئات المحددة.</span>
+                    </div>
+
+                    <div class="member-field member-field-full">
+                      <label class="membership-label">خيارات إضافية</label>
+                      <label class="flex items-center gap-2 mt-1">
+                        <input type="checkbox" id="bulk-skip-existing" checked>
+                        <span class="text-sm font-bold">تخطي الاشتراكات والدفعات الموجودة مسبقًا</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <p class="member-form-error" id="bulk-batch-error" hidden></p>
+                </form>
+
+                <div id="bulk-batch-progress" class="mt-4 hidden">
+                  <p class="text-sm font-bold text-navy-700" id="bulk-batch-status">جارٍ التنفيذ…</p>
+                  <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-navy-100">
+                    <div id="bulk-batch-progress-bar" class="h-full w-0 bg-gold-500 transition-all duration-300"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="membership-modal-footer">
+                <button type="button" class="membership-btn membership-btn-outline" data-close-bulk-batch>إلغاء</button>
+                <button type="button" class="membership-btn membership-btn-accent" id="btn-execute-bulk">تنفيذ</button>
+              </div>
+            </div>
+          </div>
+
 
         </section>
 
