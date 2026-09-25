@@ -3452,20 +3452,720 @@
   }
 
   /* ═══════════════════════════════════════════════
-     الإجراء التجميعي (bulk batch) — تنفيذ مؤقت
-     حتى المهمة 7.5. الدوال موجودة لتفادي ReferenceError
-     عند الربط، وتُستبدل لاحقًا بالتنفيذ الفعلي.
+     الإجراء التجميعي (Bulk Batch Generation)
+     يولّد لـ(سنة، شهر) محدد:
+       - دفعة خصم (deduction_batches) واحدة لكل جهة عمل (salary_deduction)
+         أو دفعة مطالبة نقدية واحدة (cash_demand) لبقية الأعضاء.
+       - اشتراك (subscriptions) شهري لكل عضو.
+       - سطر تفاصيل (deduction_batch_items) لكل عضو داخل دفعته.
+     خطوات التنفيذ:
+       1) fetchMembersForBulk(scope) — جلب الأعضاء حسب النطاق.
+       2) checkExistingBatches / checkExistingSubscriptions — التكرار.
+       3) groupMembersByEmployer — التجميع (جهات + مطالبة نقدية).
+       4) createBatchAndSubscriptions — الحفظ لكل مجموعة
+          (Partial Failure: فشل مجموعة لا يُسقط باقي المجموعات).
+     المبالغ من membership_fees (سعر الفترة) لكل membership_type.
+     ═══════════════════════════════════════════════ */
+  const BULK_MONTHS_AR = [
+    'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+    'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+  ];
+  const BULK_CHUNK = 100;        // صف لكل استعلام إدراج/استعلام (حدود Supabase)
+  const BULK_PAGE = 1000;        // صف لكل صفحة عند الجلب (الحد الافتراضي لـ PostgREST)
+  const BULK_MAX_MEMBERS = 10000; // حد أمان إجمالي
+
+  let BULK_RUNNING = false;
+
+  /* ─ شريط التقدم داخل bulk-batch-modal ─ */
+  function setBulkProgress(percent, text) {
+    const bar = document.getElementById('bulk-batch-progress-bar');
+    if (bar) bar.style.width = Math.min(100, Math.max(0, percent)) + '%';
+    setText('bulk-batch-status', text || '');
+  }
+
+  function showBulkProgress(visible) {
+    const wrap = document.getElementById('bulk-batch-progress');
+    if (wrap) wrap.classList.toggle('hidden', !visible);
+  }
+
+  function resetBulkProgress() {
+    setBulkProgress(0, 'جارٍ التنفيذ…');
+    showBulkProgress(false);
+    const errEl = document.getElementById('bulk-batch-error');
+    if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
+  }
+
+  /* ─ تعبئة قوائم السنة والشهر ─ */
+  function fillBulkYearOptions(selectedYear) {
+    const el = document.getElementById('bulk-year');
+    if (!el) return;
+    const current = new Date().getFullYear();
+    const sel = Number(selectedYear) || current;
+    const years = [];
+    for (let y = current + 2; y >= current - 2; y--) years.push(y);
+    if (!years.includes(sel)) years.unshift(sel);
+    el.innerHTML = years
+      .map((y) => `<option value="${y}"${y === sel ? ' selected' : ''}>${y}</option>`)
+      .join('');
+  }
+
+  function fillBulkMonthOptions(selectedMonth) {
+    const el = document.getElementById('bulk-month');
+    if (!el) return;
+    const sel = Number(selectedMonth) || (new Date().getMonth() + 1);
+    el.innerHTML = BULK_MONTHS_AR
+      .map((name, i) => {
+        const m = i + 1;
+        return `<option value="${m}"${m === sel ? ' selected' : ''}>${name}</option>`;
+      })
+      .join('');
+  }
+
+  /* ═══════════════════════════════════════════════
+     1) نافذة الإجراء التجميعي
      ═══════════════════════════════════════════════ */
   function openBulkBatchModal() {
-    if (typeof toast === 'function') toast('الإجراء التجميعي قيد الإنشاء — قريبًا', 'info');
+    const modal = document.getElementById('bulk-batch-modal');
+    if (!modal) return;
+
+    const now = new Date();
+    fillBulkYearOptions(now.getFullYear());
+    fillBulkMonthOptions(now.getMonth() + 1);
+    setVal('bulk-scope', 'all');
+    const skipEl = document.getElementById('bulk-skip-existing');
+    if (skipEl) skipEl.checked = true;
+    resetBulkProgress();
+
+    modal.classList.remove('hidden');
   }
 
   function closeBulkBatchModal() {
-    /* لا شيء حاليًا — يُستبدل لاحقًا بإغلاق النافذة */
+    const modal = document.getElementById('bulk-batch-modal');
+    if (modal) modal.classList.add('hidden');
+    resetBulkProgress();
   }
 
-  function executeBulkBatch() {
-    if (typeof toast === 'function') toast('تنفيذ الدفعة التجميعية قيد الإنشاء — قريبًا', 'info');
+  /* ═══════════════════════════════════════════════
+     2) جلب الأعضاء المستهدفين حسب النطاق
+     ═══════════════════════════════════════════════ */
+  const BULK_MEMBER_SELECT = [
+    'id', 'full_name', 'employee_number',
+    'status', 'service_status', 'collection_method',
+    'employer_id', 'deduction_entity_id', 'membership_type_id',
+    'employers:employer_id ( id, name )',
+  ].join(', ');
+
+  async function fetchMembersForBulk(scope, year, month) {
+    const sb = membersSb();
+    if (!sb) throw new Error('no_db');
+
+    // ملاحظة: year/month ليسا جزءًا من تصفية الأعضاء — يحتفظان بالتواقيع.
+    // تضييق النطاق:
+    //   all       → كل الأعضاء النشطين (يُقسَّمون لاحقًا في groupMembersByEmployer)
+    //   employees → service_status=active + collection_method=salary_deduction + جهة عمل
+    //   pension   → متقاعد/خارج الخدمة أو تحصيل نقدي.
+    //                (قيم members.collection_method الفعلية: 'cash' | 'salary_deduction' —
+    //                 'cash_demand' هو مصطلح الدفعات وليس طريقة تحصيل عضو.)
+
+    // بناء الاستعلام لكل صفحة (يسمح بتبديل قائمة الحقول عند 42703 دون إعادة بناء يدوية)
+    const buildQuery = (selectSpec) => {
+      let q = sb
+        .from('members')
+        .select(selectSpec)
+        .eq('status', 'active')
+        .order('id', { ascending: true });
+      if (scope === 'employees') {
+        q = q.eq('service_status', 'active').eq('collection_method', 'salary_deduction').not('employer_id', 'is', null);
+      } else if (scope === 'pension') {
+        q = q.or('service_status.in.(retired,external),collection_method.eq.cash');
+      }
+      return q;
+    };
+
+    let selectSpec = BULK_MEMBER_SELECT;
+    const all = [];
+    for (let from = 0; from < BULK_MAX_MEMBERS; from += BULK_PAGE) {
+      let { data, error } = await buildQuery(selectSpec).range(from, from + BULK_PAGE - 1);
+      if (error) {
+        // دفاعًا ضد اختلاف مخطط الجدول: إعادة نفس الصفحة دون عمود deduction_entity_id
+        if (error.code === '42703' && selectSpec === BULK_MEMBER_SELECT) {
+          console.warn('[Baraka Membership] deduction_entity_id column missing — retrying without it');
+          selectSpec = BULK_MEMBER_SELECT.split(',').filter((c) => c.indexOf('deduction_entity_id') === -1).join(',');
+          continue;
+        }
+        throw error;
+      }
+      const rows = data || [];
+      all.push(...rows);
+      if (rows.length < BULK_PAGE) break;
+    }
+    return all;
+  }
+
+  /* ═══════════════════════════════════════════════
+     3) التحقق من التكرار
+     ═══════════════════════════════════════════════ */
+  async function checkExistingSubscriptions(memberIds, year, month) {
+    const sb = membersSb();
+    const ids = (memberIds || [])
+      .map((v) => Number(v))
+      .filter((v) => Number.isInteger(v) && v > 0);
+    if (!sb || !ids.length) return new Set();
+
+    const chunks = [];
+    for (let i = 0; i < ids.length; i += BULK_CHUNK) chunks.push(ids.slice(i, i + BULK_CHUNK));
+
+    const results = await Promise.all(chunks.map((chunk) =>
+      sb.from('subscriptions')
+        .select('member_id')
+        .eq('period_year', year)
+        .eq('period_month', month)
+        .eq('frequency', 'monthly')
+        .in('member_id', chunk)
+    ));
+
+    const existing = new Set();
+    results.forEach(({ data, error }) => {
+      if (error) console.warn('[Baraka Membership] checkExistingSubscriptions chunk error:', error);
+      (data || []).forEach((r) => existing.add(Number(r.member_id)));
+    });
+    return existing;
+  }
+
+  async function checkExistingBatches(year, month) {
+    const sb = membersSb();
+    if (!sb) return [];
+    const { data, error } = await sb
+      .from('deduction_batches')
+      .select('id, batch_number, payment_method, deduction_entity_id')
+      .eq('period_year', year)
+      .eq('period_month', month);
+    if (error) throw error;
+    return data || [];
+  }
+
+  /* ═══════════════════════════════════════════════
+     4) التجميع حسب جهة العمل
+     ═══════════════════════════════════════════════ */
+  function groupMembersByEmployer(members) {
+    const salaryGroups = new Map();
+    const cashMembers = [];
+
+    (members || []).forEach((m) => {
+      const isSalary = m.service_status === 'active'
+        && m.collection_method === 'salary_deduction'
+        && m.employer_id;
+      if (isSalary) {
+        const key = Number(m.employer_id);
+        if (!salaryGroups.has(key)) {
+          salaryGroups.set(key, {
+            employerId: key,
+            employerName: joinName(m.employers) || ('جهة العمل #' + key),
+            members: [],
+          });
+        }
+        salaryGroups.get(key).members.push(m);
+      } else {
+        // متقاعدون / خارج الخدمة / بلا جهة / تحصيل نقدي → مطالبة نقدية واحدة
+        cashMembers.push(m);
+      }
+    });
+
+    return { salaryGroups: Array.from(salaryGroups.values()), cashMembers };
+  }
+
+  /** تحديد جهة الخصم (deduction_entities) الملائمة لمجموعة جهة عمل */
+  async function resolveDeductionEntity(sb, employerId, groupMembers) {
+    // 1) إن كانت غالبية الأعضاء تحمل deduction_entity_id صريحة → تفضيلها
+    const counts = {};
+    (groupMembers || []).forEach((m) => {
+      const eid = Number(m.deduction_entity_id || 0);
+      if (eid > 0) counts[eid] = (counts[eid] || 0) + 1;
+    });
+    let best = null;
+    let bestCount = 0;
+    Object.keys(counts).forEach((k) => {
+      if (counts[k] > bestCount) { bestCount = counts[k]; best = Number(k); }
+    });
+    if (best) return best;
+
+    // 2) الربط many-to-many بين الجهة وجهة الخصم (الافتراضية أولًا)
+    try {
+      const { data, error } = await sb
+        .from('employer_deduction_entities')
+        .select('deduction_entity_id, is_default')
+        .eq('employer_id', employerId)
+        .order('is_default', { ascending: false })
+        .limit(1);
+      if (error) console.warn('[Baraka Membership] resolveDeductionEntity error:', error);
+      if (data && data.length) {
+        const eid = Number(data[0].deduction_entity_id);
+        if (eid > 0) return eid;
+      }
+    } catch (e) {
+      console.warn('[Baraka Membership] resolveDeductionEntity error:', e);
+    }
+    return null;
+  }
+
+  /* ═══════════════════════════════════════════════
+     5) أرقام الدفعات والمبالغ
+     ═══════════════════════════════════════════════ */
+  /** B-{year}-{month}-{seq:03d} مع تفادي الأرقام المستخدمة مسبقًا */
+  function generateBatchNumber(year, month, sequence, existingNumbers) {
+    const taken = new Set([...(existingNumbers || [])].map((n) => String(n || '')));
+    const mm = String(month).padStart(2, '0');
+    let seq = Math.max(1, Number(sequence) || 1);
+    let candidate;
+    do {
+      candidate = `B-${year}-${mm}-${String(seq).padStart(3, '0')}`;
+      seq += 1;
+    } while (taken.has(candidate));
+    return candidate;
+  }
+
+  /** سعر الشهر لكل نوع عضوية من سجل membership_fees التاريخي */
+  async function fetchMonthlyFeesByType(year, month) {
+    const sb = membersSb();
+    if (!sb) throw new Error('no_db');
+
+    const periodDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const { data, error } = await sb
+      .from('membership_fees')
+      .select('membership_type_id, monthly_fee, effective_from, effective_to');
+    if (error) throw error;
+
+    const feesByType = {};
+    (data || []).forEach((fee) => {
+      const from = String(fee.effective_from || '').slice(0, 10);
+      const to = fee.effective_to ? String(fee.effective_to).slice(0, 10) : null;
+      if (!from || from > periodDate) return;
+      if (to && to < periodDate) return;
+      feesByType[Number(fee.membership_type_id)] = Number(fee.monthly_fee) || 0;
+    });
+    return feesByType;
+  }
+
+  /* ═══════════════════════════════════════════════
+     6) إنشاء دفعة + اشتراكات + عناصر الدفعة (لمجموعة)
+     ═══════════════════════════════════════════════ */
+  async function insertSubscriptionsChunked(sb, rows) {
+    const stats = { created: 0, existing: 0, failed: [] };
+
+    for (let i = 0; i < rows.length; i += BULK_CHUNK) {
+      const chunk = rows.slice(i, i + BULK_CHUNK);
+      const { error } = await sb.from('subscriptions').insert(chunk);
+      if (!error) { stats.created += chunk.length; continue; }
+
+      // فشل الجمعي (غالبًا 23505) → محاولة صف-بصف لعزل الفشل
+      console.warn('[Baraka Membership] subscriptions insert failed, retrying row-by-row:', error.message);
+      for (const row of chunk) {
+        try {
+          const r = await sb.from('subscriptions').insert(row);
+          if (r.error) throw r.error;
+          stats.created += 1;
+        } catch (e) {
+          if (e && e.code === '23505') stats.existing += 1;
+          else {
+            stats.failed.push(Number(row.member_id));
+            console.error('[Baraka Membership] insertSubscription error:', e);
+          }
+        }
+      }
+    }
+    return stats;
+  }
+
+  async function createBatchAndSubscriptions(args) {
+    const { sb, group, year, month, feesByType, skipExisting, existingBatches, seqCounter, takenBatchNumbers } = args;
+    const isCash = group.paymentMethod === 'cash_demand';
+
+    const result = {
+      label: group.label,
+      batchCreated: false,
+      batchReused: false,
+      batchId: null,
+      batchNumber: null,
+      membersAdded: 0,
+      subsCreated: 0,
+      subsExisting: 0,
+      subsFailed: 0,
+      itemsCreated: 0,
+      noFeeMembers: 0,
+      error: null,
+    };
+
+    const entityKeyOf = (pm, eid) => `${pm}|${eid == null ? 'null' : eid}`;
+
+    /* (1) الدفعة: إعادة استخدام موجودة عند skipExisting، وإلا إنشاء جديدة */
+    const existingBatch = skipExisting
+      ? (existingBatches || []).find((b) => entityKeyOf(b.payment_method, b.deduction_entity_id) === entityKeyOf(group.paymentMethod, group.deductionEntityId))
+      : null;
+
+    if (existingBatch) {
+      result.batchId = Number(existingBatch.id);
+      result.batchNumber = existingBatch.batch_number;
+      result.batchReused = true;
+    } else {
+      const payload = {
+        batch_number: generateBatchNumber(year, month, seqCounter.next, takenBatchNumbers),
+        period_year: year,
+        period_month: month,
+        payment_method: group.paymentMethod,
+        deduction_entity_id: group.deductionEntityId,
+        total_members: 0, // تُحسب من العناصر الفعلية بعد الحفظ
+        total_amount: 0,
+        status: 'draft',
+        notes: 'توليد آلي — إجراء تجميعي',
+      };
+      seqCounter.next += 1;
+      takenBatchNumbers.add(payload.batch_number);
+
+      const { data, error } = await sb
+        .from('deduction_batches')
+        .insert(payload)
+        .select('id, batch_number')
+        .maybeSingle();
+      if (error) {
+        result.error = (error.code === '23505')
+          ? 'توجد دفعة موجودة مسبقًا لنفس الفترة والجهة.'
+          : (error.message || 'تعذَّر إنشاء الدفعة.');
+        return result;
+      }
+      result.batchId = data ? Number(data.id) : null;
+      result.batchNumber = data ? data.batch_number : payload.batch_number;
+
+      // (نادرًا) نجاح الإدراج دون استرجاع معرّف → الاسترجاع من رقم الدفعة
+      if (!result.batchId) {
+        const { data: found } = await sb
+          .from('deduction_batches')
+          .select('id, batch_number')
+          .eq('batch_number', payload.batch_number)
+          .maybeSingle();
+        if (found) {
+          result.batchId = Number(found.id);
+          result.batchNumber = found.batch_number;
+          result.batchReused = true;
+        }
+      }
+      if (!result.batchId) {
+        result.error = 'تعذَّر استرجاع معرّف الدفعة بعد الإنشاء.';
+        return result;
+      }
+      result.batchCreated = true;
+    }
+
+    /* (2) تحديد الأعضاء الجدد في هذه المجموعة (تخطي الموجود عند skipExisting) */
+    let targetMembers = group.members;
+    if (skipExisting) {
+      const existingSubs = await checkExistingSubscriptions(targetMembers.map((m) => m.id), year, month);
+      if (existingSubs.size) {
+        targetMembers = targetMembers.filter((m) => !existingSubs.has(Number(m.id)));
+      }
+      // عناصر موجودة مسبقًا في الدفعة المعاد استخدامها → تخطيها
+      if (result.batchReused && targetMembers.length) {
+        const itemMemberIds = new Set();
+        const ids = targetMembers.map((m) => Number(m.id));
+        for (let i = 0; i < ids.length; i += BULK_CHUNK) {
+          const chunk = ids.slice(i, i + BULK_CHUNK);
+          const { data, error } = await sb
+            .from('deduction_batch_items')
+            .select('member_id')
+            .eq('batch_id', result.batchId)
+            .in('member_id', chunk);
+          if (error) console.warn('[Baraka Membership] existing items check error:', error);
+          (data || []).forEach((r) => itemMemberIds.add(Number(r.member_id)));
+        }
+        if (itemMemberIds.size) {
+          targetMembers = targetMembers.filter((m) => !itemMemberIds.has(Number(m.id)));
+        }
+      }
+    }
+
+    result.membersAdded = targetMembers.length;
+    if (!targetMembers.length) return result;
+
+    /* (3) صفوف الاشتراكات + عناصر الدفعة */
+    const subRows = [];
+    const itemRows = [];
+    targetMembers.forEach((m) => {
+      const typeId = m.membership_type_id == null ? null : Number(m.membership_type_id);
+      const hasFee = typeId != null && Object.prototype.hasOwnProperty.call(feesByType, typeId);
+      const amount = hasFee ? (Number(feesByType[typeId]) || 0) : 0;
+      if (!hasFee) result.noFeeMembers += 1;
+
+      subRows.push({
+        member_id: Number(m.id),
+        period_year: year,
+        period_month: month,
+        frequency: 'monthly',
+        amount,
+        paid_amount: 0,
+        status: 'pending',
+        // قيد CHECK على subscriptions يقبل ('cash', 'salary_deduction') فقط —
+        // تُخزَّن المطالبة النقدية كـ 'cash' ولا يُخالف القيد.
+        payment_method: isCash ? 'cash' : 'salary_deduction',
+      });
+
+      itemRows.push({
+        batch_id: result.batchId,
+        member_id: Number(m.id),
+        employee_number: m.employee_number || '',
+        full_name: m.full_name || '',
+        employer_name: isCash ? '' : (group.employerName || ''),
+        primary_amount: amount,
+        dependents_amount: 0,
+        adjustments_amount: 0,
+        total_amount: amount,
+        dependents_count: 0,
+        dependents_list: [],
+        status: 'pending',
+      });
+    });
+
+    const subStats = await insertSubscriptionsChunked(sb, subRows);
+    result.subsCreated = subStats.created;
+    result.subsExisting = subStats.existing;
+    result.subsFailed = subStats.failed.length;
+
+    /* (4) عناصر الدفعة (سطر لكل عضو — ما تعرضه نافذة تفاصيل الدفعة) */
+    for (let i = 0; i < itemRows.length; i += BULK_CHUNK) {
+      const chunk = itemRows.slice(i, i + BULK_CHUNK);
+      const { error } = await sb.from('deduction_batch_items').insert(chunk);
+      if (!error) {
+        result.itemsCreated += chunk.length;
+        continue;
+      }
+      console.error('[Baraka Membership] insertBatchItems error, retrying row-by-row:', error.message);
+      for (const row of chunk) {
+        const r = await sb.from('deduction_batch_items').insert(row);
+        if (!r.error) result.itemsCreated += 1;
+      }
+    }
+
+    /* (5) تحديث إجماليات الدفعة من العناصر الفعلية */
+    try {
+      const { data: allItems, error: itemsErr } = await sb
+        .from('deduction_batch_items')
+        .select('member_id, total_amount')
+        .eq('batch_id', result.batchId)
+        .limit(BULK_PAGE);
+      if (!itemsErr && allItems) {
+        const memberSet = new Set();
+        let total = 0;
+        allItems.forEach((it) => {
+          memberSet.add(Number(it.member_id));
+          total += Number(it.total_amount) || 0;
+        });
+        await sb
+          .from('deduction_batches')
+          .update({
+            total_members: memberSet.size,
+            total_amount: Math.round(total * 100) / 100,
+          })
+          .eq('id', result.batchId);
+      }
+    } catch (e) {
+      console.warn('[Baraka Membership] batch totals update error:', e);
+    }
+
+    return result;
+  }
+
+  /* ═══════════════════════════════════════════════
+     7) التنفيذ الكامل
+     ═══════════════════════════════════════════════ */
+  async function executeBulkBatch(year, month, scope, skipExisting) {
+    if (BULK_RUNNING) {
+      if (typeof toast === 'function') toast('جارٍ تنفيذ إجراء تجميعي بالفعل — انتظر الانتهاء.', 'error');
+      return;
+    }
+
+    // القراءة من النموذج عند عدم تمرير القيم (الاستدعاء من الزر)
+    const val = (id) => {
+      const el = document.getElementById(id);
+      return el ? String(el.value || '').trim() : '';
+    };
+    if (year === undefined || year === null || year === '') year = Number(val('bulk-year'));
+    if (month === undefined || month === null || month === '') month = Number(val('bulk-month'));
+    if (!scope) scope = val('bulk-scope') || 'all';
+    if (skipExisting === undefined || skipExisting === null) {
+      const skipEl = document.getElementById('bulk-skip-existing');
+      skipExisting = skipEl ? skipEl.checked : true;
+    }
+
+    console.log('[Baraka] executeBulkBatch called with:', { year, month, scope, skipExisting });
+
+    const sb = membersSb();
+    const errEl = document.getElementById('bulk-batch-error');
+    const fail = (msg) => {
+      if (errEl) { errEl.textContent = msg; errEl.hidden = false; }
+      if (typeof toast === 'function') toast(msg, 'error');
+    };
+
+    year = Number(year);
+    month = Number(month);
+    skipExisting = !!skipExisting;
+
+    if (!sb) { fail('لا يوجد اتصال بقاعدة البيانات.'); return; }
+    if (!year || year < 1900 || year > 2100 || !month || month < 1 || month > 12) {
+      fail('السنة والشهر حقول إلزامية بقيم صالحة.');
+      return;
+    }
+    if (!['all', 'employees', 'pension'].includes(scope)) scope = 'all';
+
+    const btn = document.getElementById('btn-execute-bulk');
+    BULK_RUNNING = true;
+    if (btn) { btn.disabled = true; btn.textContent = 'جارٍ التنفيذ…'; }
+    resetBulkProgress();
+    showBulkProgress(true);
+
+    const summary = {
+      members: 0,
+      groups: 0,
+      batchesCreated: 0,
+      batchesReused: 0,
+      subsCreated: 0,
+      subsExisting: 0,
+      subsFailed: 0,
+      itemsCreated: 0,
+      noFeeMembers: 0,
+      failures: [],
+    };
+
+    try {
+      /* 1) جلب الأعضاء */
+      setBulkProgress(5, 'جارٍ جلب الأعضاء المستهدفين…');
+      const members = await fetchMembersForBulk(scope, year, month);
+      summary.members = members.length;
+      console.log('[Baraka] fetchMembersForBulk →', members.length, 'members for scope:', scope);
+
+      if (!members.length) {
+        setBulkProgress(100, 'لا يوجد أعضاء مطابقون للنطاق المحدد.');
+        if (typeof toast === 'function') toast('لا يوجد أعضاء مطابقون للنطاق المحدد', 'info');
+        return;
+      }
+
+      /* 2) التحقق من التكرار */
+      let existingBatches = [];
+      if (skipExisting) {
+        setBulkProgress(20, 'جارٍ التحقق من الدفعات والاشتراكات الموجودة…');
+        existingBatches = await checkExistingBatches(year, month);
+        console.log('[Baraka] existing batches for', year, month, '→', existingBatches.length);
+      }
+
+      /* 3) مبالغ الفترة + التجميع */
+      setBulkProgress(35, 'جارٍ حساب المبالغ وتجميع الجهات…');
+      const feesByType = await fetchMonthlyFeesByType(year, month);
+
+      const { salaryGroups, cashMembers } = groupMembersByEmployer(members);
+      const groups = [];
+      for (const g of salaryGroups) {
+        const entityId = await resolveDeductionEntity(sb, g.employerId, g.members);
+        if (!entityId) {
+          console.warn('[Baraka] bulk: no deduction entity resolved for employer', g.employerId);
+        }
+        groups.push({
+          key: 'salary-' + g.employerId,
+          label: 'خصم رواتب — ' + g.employerName,
+          paymentMethod: 'salary_deduction',
+          deductionEntityId: entityId,
+          employerName: g.employerName,
+          members: g.members,
+        });
+      }
+      if (cashMembers.length) {
+        groups.push({
+          key: 'cash',
+          label: 'مطالبة نقدية — متقاعدون وخارج الخدمة',
+          paymentMethod: 'cash_demand',
+          deductionEntityId: null,
+          employerName: '',
+          members: cashMembers,
+        });
+      }
+      summary.groups = groups.length;
+      console.log('[Baraka] bulk groups →', groups.map((g) => `${g.key}(${g.members.length})`).join(', '));
+
+      /* 4) إنشاء الدفعات والاشتراكات (كل مجموعة مستقلة — فشل أحدها لا يُسقط البقية) */
+      const takenBatchNumbers = new Set(existingBatches.map((b) => b.batch_number).filter(Boolean));
+      const seqCounter = { next: 1 };
+
+      for (let i = 0; i < groups.length; i++) {
+        const group = groups[i];
+        setBulkProgress(
+          40 + Math.round(55 * (i / groups.length)),
+          `جارٍ معالجة: ${group.label} (${i + 1}/${groups.length})`
+        );
+
+        const result = await createBatchAndSubscriptions({
+          sb, group, year, month, feesByType, skipExisting,
+          existingBatches, seqCounter, takenBatchNumbers,
+        });
+
+        if (result.error) {
+          summary.failures.push({ label: group.label, message: result.error });
+          console.error('[Baraka Membership] bulk group failed:', group.key, result.error);
+          continue;
+        }
+
+        if (result.batchCreated) summary.batchesCreated += 1;
+        if (result.batchReused) summary.batchesReused += 1;
+        summary.subsCreated += result.subsCreated;
+        summary.subsExisting += result.subsExisting;
+        summary.subsFailed += result.subsFailed;
+        summary.itemsCreated += result.itemsCreated;
+        summary.noFeeMembers += result.noFeeMembers;
+
+        console.log('[Baraka] bulk group done:', group.key, JSON.stringify({
+          batch: result.batchNumber,
+          created: result.batchCreated,
+          reused: result.batchReused,
+          subs: result.subsCreated,
+          items: result.itemsCreated,
+        }));
+      }
+
+      /* 5) تحديث قوائم التبويب + النتائج النهائية */
+      setBulkProgress(95, 'جارٍ تحديث القوائم…');
+      loadBatches().catch((e) => console.error('[Baraka Membership] post-bulk loadBatches error:', e));
+      loadSubscriptions().catch((e) => console.error('[Baraka Membership] post-bulk loadSubscriptions error:', e));
+
+      const monthLabel = BULK_MONTHS_AR[month - 1] || month;
+      const baseMsg = `تم إنشاء ${summary.batchesCreated} دفعة خصم و ${summary.subsCreated} اشتراك بنجاح`
+        + (summary.batchesReused ? ` (مع إعادة استخدام ${summary.batchesReused} دفعة موجودة)` : '')
+        + ` — ${monthLabel} ${year}.`;
+
+      const warnParts = [];
+      if (summary.subsExisting) warnParts.push(`تم تخطي ${summary.subsExisting} اشتراكًا موجودًا مسبقًا`);
+      if (summary.noFeeMembers) warnParts.push(`تنبيه: ${summary.noFeeMembers} عضوًا بلا سعر مفصَّل (مبلغ 0)`);
+      if (summary.subsFailed) warnParts.push(`فشل حفظ ${summary.subsFailed} اشتراك`);
+      const warnText = warnParts.length ? ' — ' + warnParts.join(' · ') : '';
+
+      if (summary.failures.length) {
+        const failLines = summary.failures
+          .slice(0, 5)
+          .map((f) => `${f.label}: ${f.message}`)
+          .join(' | ');
+        setBulkProgress(100, baseMsg + warnText + ` — فشل ${summary.failures.length} من ${summary.groups} مجموعات: ${failLines}`);
+        if (typeof toast === 'function') toast(baseMsg + ' لكن فشلت بعض المجموعات — راجع التفاصيل.', 'error');
+        // تُبقي النافذة مفتوحة لعرض التفاصيل
+      } else {
+        setBulkProgress(100, baseMsg + warnText);
+        closeBulkBatchModal();
+        if (typeof toast === 'function') toast(baseMsg + warnText, 'success');
+      }
+    } catch (e) {
+      console.error('[Baraka Membership] executeBulkBatch error:', e);
+      const msg = (e && e.message === 'no_db')
+        ? 'لا يوجد اتصال بقاعدة البيانات.'
+        : 'تعذَّر تنفيذ الإجراء التجميعي — تحقَّق من الاتصال ثم أعد المحاولة.';
+      setBulkProgress(100, msg);
+      fail(msg);
+    } finally {
+      BULK_RUNNING = false;
+      if (btn) { btn.disabled = false; btn.textContent = 'تنفيذ'; }
+    }
   }
 
   function bindBatches() {
@@ -3514,6 +4214,12 @@
     if (bulkBtn && !bulkBtn.dataset.bulkBatchOpenBound) {
       bulkBtn.dataset.bulkBatchOpenBound = '1';
       bulkBtn.addEventListener('click', openBulkBatchModal);
+    }
+
+    const executeBtn = document.getElementById('btn-execute-bulk');
+    if (executeBtn && !executeBtn.dataset.bulkExecuteBound) {
+      executeBtn.dataset.bulkExecuteBound = '1';
+      executeBtn.addEventListener('click', () => { executeBulkBatch(); });
     }
 
     const exportBtn = document.getElementById('btn-export-batches');
@@ -4165,6 +4871,14 @@
     openBulkBatchModal,
     closeBulkBatchModal,
     executeBulkBatch,
+    fetchMembersForBulk,
+    checkExistingSubscriptions,
+    checkExistingBatches,
+    groupMembersByEmployer,
+    resolveDeductionEntity,
+    generateBatchNumber,
+    fetchMonthlyFeesByType,
+    createBatchAndSubscriptions,
 
     /* ─ تبويب جهات العمل ─ */
     loadEmployers,
