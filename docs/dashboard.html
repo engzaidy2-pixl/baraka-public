@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>بركة | لوحة التحكم — منصة الجمعيات (الخيار ب)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { cairo: ['"Cairo"', 'sans-serif'], tajawal: ['"Tajawal"', 'sans-serif'], display: ['"Tajawal"', '"Cairo"', 'sans-serif'] },
+          colors: {
+            navy: { 50:'#f2f5f9',100:'#e2e8f2',200:'#c9d4e6',300:'#a3b5d2',400:'#7790b8',500:'#58729f',600:'#455b85',700:'#394a6c',800:'#2c3a55',900:'#1d2740',950:'#10182b' },
+            gold: { 50:'#fbf7ea',100:'#f5ebc8',200:'#ead694',300:'#e0c064',400:'#d5ab3d',500:'#c9a227',600:'#a98420',700:'#86661d',800:'#6b511c',900:'#57421b' },
+            ivory: '#faf8f2',
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="style.css?v=20260921b">
+</head>
+<body class="bg-ivory min-h-screen font-cairo text-navy-900 antialiased">
+
+  <!-- شاشة التحميل -->
+  <div id="app-loading" class="app-loading" aria-hidden="true">
+    <div class="app-loading-content">
+      <div class="app-loading-logo">ب</div>
+      <div class="app-loading-title">بركة | منصة الجمعيات</div>
+      <div class="app-loading-spinner"></div>
+      <div class="app-loading-text">جارٍ التحميل...</div>
+      <div class="app-loading-hint" id="app-loading-hint"></div>
+    </div>
+  </div>
+  <script>
+    /* ═══ شاشة التحميل: تُخفى عند اكتمال تحميل التطبيق (مع حد أمان) ═══
+       أنماطها في style.css فقط (لا تعتمد على Tailwind) حتى تظهر
+       بشكل سليم ولو تأخر تحميل Tailwind Play CDN أو فشل. */
+    (function () {
+      const el = document.getElementById('app-loading');
+      if (!el) return;
+
+      let hidden = false;
+      const fadeOut = () => {
+        if (hidden) return;
+        hidden = true;
+        el.classList.add('app-loading-hide');
+        setTimeout(() => el.remove(), 500);
+      };
+
+      /* يُستدعى عند اكتمال تهيئة التطبيق — ينتظر اكتمال الموارد (الخطوط) قبل الإخفاء لتفادي وميض الخط */
+      window.hideAppLoading = () => {
+        if (hidden) return;
+        if (document.readyState === 'complete') setTimeout(fadeOut, 180);
+        else window.addEventListener('load', () => setTimeout(fadeOut, 180), { once: true });
+      };
+
+      /* حد أمان: تختفي الشاشة مهما حدث بعد 8 ثوانٍ (شبكة بطيئة جدًا أو فشل CDN) */
+      setTimeout(fadeOut, 8000);
+
+      /* تلميح لطيف يظهر بعد 4 ثوانٍ إن لم يكتمل التحميل */
+      const hint = document.getElementById('app-loading-hint');
+      if (hint) {
+        setTimeout(() => {
+          if (hidden) return;
+          hint.textContent = 'يبدو أن الاتصال بطيء — نواصل التحميل، لحظة من فضلك…';
+          hint.classList.add('app-loading-hint-show');
+        }, 4000);
+      }
+    })();
+  </script>
+
+  <!-- طبقة تعتيم (هاتف/تابلت) -->
+  <div id="mobile-overlay" onclick="toggleSidebar()" class="fixed inset-0 z-40 hidden bg-navy-950/40 backdrop-blur-sm lg:hidden" aria-hidden="true"></div>
+
+  <div class="flex min-h-screen">
+    <!-- ═══ الشريط الجانبي: مجموعات منسدلة، يُبنى ديناميكيًا من modules ═══ -->
+    <aside id="sidebar" aria-label="التنقل الرئيسي"
+      class="fixed inset-y-0 right-0 z-50 flex w-80 max-w-[85vw] translate-x-full flex-col border-l-2 border-gold-500/25 bg-navy-950 shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-none">
+      <div class="flex items-center gap-3 border-b border-white/10 px-5 py-5">
+        <span id="sidebar-brand"></span>
+        <div class="min-w-0 leading-tight">
+          <p id="sidebar-assoc-name" class="truncate font-display text-[15px] font-black text-white">—</p>
+          <p class="text-[11px] font-bold text-gold-400">بركة | منصة الجمعيات</p>
+        </div>
+        <button onclick="toggleSidebar()" class="mr-auto rounded-lg p-1.5 text-navy-300 hover:text-white lg:hidden" aria-label="إغلاق القائمة">✕</button>
+      </div>
+
+      <nav class="flex-1 overflow-y-auto px-3 py-4" aria-label="وحدات النظام">
+        <div id="modules-nav"></div>
+      </nav>
+
+      <div class="border-t border-white/10 p-4">
+        <div class="mb-3 flex items-center gap-3">
+          <span id="user-avatar" class="flex h-10 w-10 items-center justify-center rounded-full bg-gold-500/15 font-display text-sm font-black text-gold-300">—</span>
+          <div class="min-w-0 leading-tight">
+            <p id="sidebar-user-name" class="truncate text-sm font-extrabold text-white"></p>
+            <p id="sidebar-user-role" class="truncate text-[11px] font-bold text-gold-400"></p>
+          </div>
+        </div>
+        <button onclick="logout()" class="flex w-full items-center justify-center gap-2 rounded-md border border-red-400/30 bg-red-900/30 px-4 py-2.5 text-sm font-extrabold text-red-200 transition-all hover:bg-red-900/50">
+          تسجيل الخروج
+        </button>
+      </div>
+    </aside>
+
+    <!-- ═══ المحتوى ═══ -->
+    <div class="flex min-w-0 flex-1 flex-col">
+      <!-- الشريط العلوي الثابت -->
+      <header class="sticky top-0 z-30 border-b-2 border-gold-500/30 bg-ivory/95 backdrop-blur-xl">
+        <div class="dashboard-topbar flex items-center gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
+          <button onclick="toggleSidebar()" class="topbar-menu-toggle rounded-xl bg-navy-900 p-2.5 text-gold-400 transition-colors hover:bg-navy-800 lg:hidden" aria-label="فتح القائمة" aria-expanded="false" aria-controls="sidebar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+          </button>
+          <div class="dashboard-topbar-title min-w-0">
+            <h1 id="page-title" class="truncate font-display text-lg font-black text-navy-900 sm:text-xl">لوحة التحكم</h1>
+            <p class="hidden text-[11px] font-bold text-navy-500 sm:block"><span id="assoc-name">—</span> — مساحة الخزينة</p>
+          </div>
+          <div class="dashboard-topbar-actions ms-auto flex items-center gap-4">
+            <!-- أيقونات الشريط العلوي (مركز التقارير، الإشعارات، الرسائل) -->
+            <div id="topbar-icons" class="topbar-icons flex items-center gap-2"></div>
+
+            <div class="dashboard-topbar-date hidden border-s border-gold-500/40 ps-4 text-end md:block">
+              <p id="date-hijri" class="text-[11px] font-black leading-tight text-gold-700">—</p>
+              <p id="date-gregorian" class="text-[11px] font-semibold leading-tight text-navy-500">—</p>
+            </div>
+            <div class="dashboard-topbar-user flex items-center gap-2.5 border-s border-gold-500/40 ps-4">
+              <div class="hidden text-end leading-tight min-[420px]:block">
+                <p id="user-name" class="text-[13px] font-black text-navy-900">—</p>
+                <p id="user-role" class="hidden text-[11px] font-bold text-gold-700 sm:block">—</p>
+              </div>
+              <span id="topbar-avatar" class="flex h-10 w-10 items-center justify-center rounded-full bg-navy-100 font-display text-sm font-black text-navy-800">—</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="dashboard-main flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <!-- ── لوحة التحكم: بطاقات فارغة + قيد الإنشاء ── -->
+        <section id="tab-dashboard" class="mx-auto max-w-6xl fade-up" aria-label="لوحة التحكم">
+          <div class="mb-6 flex flex-col gap-3 rounded-2xl border-2 border-dashed border-navy-200 bg-gold-50 p-5 sm:flex-row sm:items-center">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold-100 text-gold-700">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 3v3"/><path d="M12 18v3"/><path d="M3 12h3"/><path d="M18 12h3"/><path d="m5.6 5.6 2.1 2.1"/><path d="m16.3 16.3 2.1 2.1"/><path d="m5.6 18.4 2.1-2.1"/><path d="m16.3 7.7 2.1-2.1"/></svg>
+            </span>
+            <div class="flex-1">
+              <p class="font-display text-base font-black text-navy-900">هذه الوحدة قيد الإنشاء</p>
+              <p class="text-sm font-medium leading-relaxed text-navy-500">يجري تجهيز ملخص الخزينة والإيرادات والمصروفات. الوحدات الفاعلة الآن: الإعدادات والصيانة، والمستخدمون والصلاحيات.</p>
+            </div>
+            <span class="inline-flex items-center gap-1.5 self-start rounded-full bg-gold-100 px-2.5 py-1 text-[11px] font-extrabold text-gold-800 sm:self-center"><span class="b-dot"></span>قيد الإنشاء</span>
+          </div>
+
+          <div class="dashboard-grid grid grid-cols-1 gap-5 md:grid-cols-3">
+            <div class="rounded-2xl border-2 border-navy-100 bg-white p-6 shadow-xl shadow-navy-900/5 transition-transform duration-300 hover:-translate-y-1 md:col-span-2 sm:p-8">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-sm font-extrabold text-navy-500">رصيد الخزينة الحالي</p>
+                  <div class="mt-3 flex items-end gap-3">
+                    <span class="font-display text-4xl font-black tracking-tight text-navy-900 sm:text-5xl">— —</span>
+                    <span id="dash-currency" class="mb-1 text-sm font-extrabold text-gold-700">ريال سعودي</span>
+                  </div>
+                  <div class="mt-4 flex items-center gap-2">
+                    <div class="skeleton h-4 w-28 rounded-md"></div>
+                    <div class="skeleton h-4 w-16 rounded-md"></div>
+                  </div>
+                </div>
+                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gold-50 text-gold-600">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="4"/><path d="M12 10v2l1.5 1.5"/><path d="M3 8h2"/><path d="M3 16h2"/></svg>
+                </div>
+              </div>
+              <div class="dashboard-metric-split mt-6 grid grid-cols-2 gap-3">
+                <div class="rounded-xl border border-navy-100 p-3.5">
+                  <p class="text-[11px] font-extrabold text-navy-500">إيراد هذا الشهر</p>
+                  <div class="skeleton mt-2 h-5 w-20 rounded-md"></div>
+                </div>
+                <div class="rounded-xl border border-navy-100 p-3.5">
+                  <p class="text-[11px] font-extrabold text-navy-500">صرف هذا الشهر</p>
+                  <div class="skeleton mt-2 h-5 w-20 rounded-md"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-col items-center justify-center rounded-2xl border-2 border-navy-100 bg-white p-6 text-center shadow-xl shadow-navy-900/5 transition-transform duration-300 hover:-translate-y-1">
+              <div class="relative h-32 w-32">
+                <svg viewBox="0 0 100 100" class="h-full w-full -rotate-90">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke-width="9" class="stroke-navy-100"></circle>
+                  <circle cx="50" cy="50" r="42" fill="none" stroke-width="9" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="264" class="stroke-gold-500"></circle>
+                </svg>
+                <span class="absolute inset-0 flex items-center justify-center font-display text-2xl font-black text-navy-900">—</span>
+              </div>
+              <p class="mt-3 text-sm font-extrabold text-navy-500">نسبة تحصيل الاشتراكات</p>
+              <span class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-2.5 py-1 text-[10px] font-extrabold text-gold-800"><span class="b-dot"></span>قيد الإنشاء</span>
+            </div>
+
+            <div class="rounded-2xl border-2 border-navy-100 bg-white p-6 shadow-xl shadow-navy-900/5 transition-transform duration-300 hover:-translate-y-1 md:col-span-3">
+              <div class="mb-5 flex items-center justify-between">
+                <p class="font-display text-base font-black text-navy-900">أحدث العمليات</p>
+                <span class="text-xs font-extrabold text-navy-400">سيظهر هنا آخر 5 سندات قبض وصرف</span>
+              </div>
+              <div class="space-y-3">
+                <div class="flex items-center gap-4"><div class="skeleton h-9 w-9 rounded-lg"></div><div class="skeleton h-4 w-52 rounded-md"></div><div class="skeleton ms-auto hidden h-4 w-16 rounded-md sm:block"></div><div class="skeleton h-6 w-20 rounded-full"></div></div>
+                <div class="flex items-center gap-4"><div class="skeleton h-9 w-9 rounded-lg"></div><div class="skeleton h-4 w-40 rounded-md"></div><div class="skeleton ms-auto hidden h-4 w-16 rounded-md sm:block"></div><div class="skeleton h-6 w-20 rounded-full"></div></div>
+                <div class="flex items-center gap-4"><div class="skeleton h-9 w-9 rounded-lg"></div><div class="skeleton h-4 w-48 rounded-md"></div><div class="skeleton ms-auto hidden h-4 w-16 rounded-md sm:block"></div><div class="skeleton h-6 w-20 rounded-full"></div></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── شؤون العضوية (جديد: مع تبويبات فرعية) ── -->
+        <section id="tab-membership_affairs" class="mx-auto hidden max-w-5xl" aria-label="شؤون العضوية">
+          <div id="membership_affairs-tabs" class="module-tabs-host mb-5"></div>
+          <div id="membership_affairs-content" class="module-content-host"></div>
+        </section>
+
+        <!-- ── الإعدادات والصيانة (محدث: مع تبويبات فرعية) ── -->
+        <section id="tab-settings_maintenance" class="mx-auto hidden max-w-5xl" aria-label="الإعدادات والصيانة">
+          <div id="settings_maintenance-tabs" class="module-tabs-host mb-5"></div>
+          <div id="settings_maintenance-content" class="module-content-host">
+            <!-- association_profile وبقية التبويبات تُبنى هنا ديناميكيًا -->
+          </div>
+        </section>
+
+        <!-- ── المستخدمون والصلاحيات (كاملة) ── -->
+        <section id="tab-users" class="mx-auto hidden max-w-6xl" aria-label="المستخدمون والصلاحيات">
+          <div class="fade-up space-y-5">
+            <!-- مبدّل الأقسام -->
+            <div class="seg-wrap" role="tablist" aria-label="أقسام المستخدمين">
+              <button type="button" data-uview="list" class="seg-active" role="tab" aria-selected="true">المستخدمون</button>
+              <button type="button" data-uview="matrix" role="tab" aria-selected="false">الأدوار والصلاحيات</button>
+            </div>
+
+            <!-- قائمة المستخدمين -->
+            <div id="users-list-view" class="rounded-2xl border-2 border-navy-100 bg-white p-5 shadow-xl shadow-navy-900/5 sm:p-7">
+              <div class="users-toolbar mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
+                <div class="relative flex-1">
+                  <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3.5 text-navy-400">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                  </span>
+                  <input id="u-search" type="text" placeholder="بحث بالاسم أو اسم المستخدم أو البريد…" class="b-input ps-10" aria-label="بحث في المستخدمين">
+                </div>
+                <div class="users-toolbar-actions flex flex-wrap items-center gap-2">
+                  <select id="u-role-filter" class="b-input w-auto py-2.5" aria-label="تصفية حسب الدور">
+                    <option value="all">كل الأدوار</option>
+                    <option value="chairman">رئيس مجلس الإدارة</option>
+                    <option value="finance_manager">المدير المالي</option>
+                    <option value="cashier">أمين الصندوق</option>
+                    <option value="auditor">المراجع</option>
+                  </select>
+                  <select id="u-status-filter" class="b-input w-auto py-2.5" aria-label="تصفية حسب الحالة">
+                    <option value="all">كل الحالات</option>
+                    <option value="active">نشط</option>
+                    <option value="suspended">موقوف</option>
+                  </select>
+                  <button type="button" id="u-add-btn" class="hidden inline-flex items-center gap-2 rounded-md border border-gold-500/40 bg-navy-900 px-5 py-2.5 text-sm font-black text-gold-100 shadow-lg transition-all hover:-translate-y-0.5 hover:bg-navy-800">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                    إضافة مستخدم
+                  </button>
+                </div>
+              </div>
+
+              <div class="responsive-table users-responsive-table overflow-x-auto rounded-xl border border-navy-100">
+                <table class="users-table w-full min-w-[720px] text-sm">
+                  <thead class="bg-navy-900 text-[13px] text-gold-100">
+                    <tr>
+                      <th class="px-4 py-3.5 text-start font-extrabold">الاسم</th>
+                      <th class="px-4 py-3.5 text-start font-extrabold">اسم المستخدم</th>
+                      <th class="px-4 py-3.5 text-start font-extrabold">الدور</th>
+                      <th class="px-4 py-3.5 text-start font-extrabold">الحالة</th>
+                      <th class="px-4 py-3.5 text-start font-extrabold">آخر دخول</th>
+                      <th class="px-4 py-3.5 text-end font-extrabold">إجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody id="users-table-body" class="divide-y divide-navy-100"></tbody>
+                </table>
+              </div>
+              <p id="u-count" class="mt-3 text-xs font-bold text-navy-400"></p>
+            </div>
+
+            <!-- مصفوفة الأدوار والصلاحيات -->
+            <div id="matrix-view" class="hidden rounded-2xl border-2 border-navy-100 bg-white p-5 shadow-xl shadow-navy-900/5 sm:p-7">
+              <div class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 class="font-display text-lg font-black text-navy-900">مصفوفة الصلاحيات</h3>
+                  <p class="mt-1 text-sm font-medium text-navy-500">الصفوف = الوحدات (9 وحدات)، الأعمدة = الإجراءات. التغييرات تُطبَّق على القائمة الجانبية فور الحفظ.</p>
+                </div>
+                <div id="matrix-role-chips" class="flex flex-wrap gap-1.5" role="tablist" aria-label="اختيار الدور"></div>
+              </div>
+
+              <div class="responsive-table matrix-responsive-table overflow-x-auto rounded-xl border border-navy-100">
+                <table class="matrix-table w-full min-w-[680px] text-sm">
+                  <thead class="bg-navy-900 text-[13px] text-gold-100">
+                    <tr>
+                      <th class="px-4 py-3.5 text-start font-extrabold">الوحدة</th>
+                      <th class="px-4 py-3.5 text-center font-extrabold">عرض</th>
+                      <th class="px-4 py-3.5 text-center font-extrabold">إضافة</th>
+                      <th class="px-4 py-3.5 text-center font-extrabold">تعديل</th>
+                      <th class="px-4 py-3.5 text-center font-extrabold">حذف</th>
+                    </tr>
+                  </thead>
+                  <tbody id="matrix-body" class="divide-y divide-navy-100"></tbody>
+                </table>
+              </div>
+
+              <div class="mt-5 flex flex-wrap items-center justify-between gap-4">
+                <p class="max-w-md text-xs font-semibold leading-relaxed text-navy-400">
+                  ملاحظة: صلاحية العرض تُضاف تلقائيًا مع أي إجراء، وإلغاؤها يلغي بقية الإجراءات على الوحدة.
+                  صلاحيات رئيس المجلس الإدارية مُضافة في النسخة التجريبية وعدّلها كما تشاء.
+                </p>
+                <div class="flex items-center gap-3">
+                  <button type="button" id="matrix-reset" class="rounded-md border border-navy-200 bg-white px-5 py-2.5 text-sm font-extrabold text-navy-700 transition-colors hover:border-gold-500">إلغاء التغييرات</button>
+                  <button type="button" id="matrix-save" class="inline-flex items-center gap-2 rounded-md border border-gold-500/40 bg-navy-900 px-7 py-2.5 text-sm font-black text-gold-100 shadow-lg transition-all hover:-translate-y-0.5 hover:bg-navy-800">حفظ الصلاحيات</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── حاوية عامة للوحدات قيد الإنشاء ── -->
+        <section id="tab-generic" class="hidden" aria-label="وحدة قيد الإنشاء"></section>
+      </main>
+
+      <footer class="px-6 pb-6 text-center text-[11px] font-bold text-navy-400">
+        بركة | منصة الجمعيات — الخيار ب (رسمي كحلي) · مرحلة الهيكل العظمي
+      </footer>
+    </div>
+  </div>
+
+  <!-- ═══ نافذة إضافة/تعديل مستخدم ═══ -->
+  <div id="modal-user" class="b-modal hidden" role="dialog" aria-modal="true" aria-labelledby="um-title">
+    <div class="b-modal-card max-w-md">
+      <div class="flex items-center justify-between border-b border-navy-100 px-6 py-4">
+        <h3 id="um-title" class="font-display text-lg font-extrabold text-navy-900">إضافة مستخدم جديد</h3>
+        <button onclick="closeModal('modal-user')" class="rounded-lg p-1.5 text-navy-400 hover:bg-navy-50" aria-label="إغلاق">✕</button>
+      </div>
+      <div class="max-h-[70vh] space-y-4 overflow-y-auto px-6 py-5">
+        <div>
+          <label for="um-name" class="mb-1.5 block text-sm font-extrabold text-navy-800">الاسم الكامل *</label>
+          <input id="um-name" type="text" class="b-input" placeholder="مثال: عبدالله السالم">
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label for="um-username" class="mb-1.5 block text-sm font-extrabold text-navy-800">اسم المستخدم *</label>
+            <input id="um-username" type="text" dir="ltr" class="b-input text-start" placeholder="abdullah">
+          </div>
+          <div>
+            <label for="um-email" class="mb-1.5 block text-sm font-extrabold text-navy-800">البريد الإلكتروني</label>
+            <input id="um-email" type="email" dir="ltr" class="b-input text-start" placeholder="abdullah@baraka.org">
+          </div>
+        </div>
+        <div>
+          <p class="mb-1.5 text-sm font-extrabold text-navy-800">الدور</p>
+          <div id="um-role-list" class="grid grid-cols-1 gap-2 sm:grid-cols-2"></div>
+        </div>
+        <div class="flex justify-end gap-3 border-t border-navy-100 pt-4">
+          <button type="button" id="um-cancel" class="rounded-md border border-navy-200 bg-white px-5 py-2.5 text-sm font-extrabold text-navy-700 hover:border-gold-500">إلغاء</button>
+          <button type="button" id="um-submit" class="rounded-md border border-gold-500/40 bg-navy-900 px-7 py-2.5 text-sm font-black text-gold-100 hover:bg-navy-800">إضافة المستخدم</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ نافذة إعادة تعيين رمز الدخول ═══ -->
+  <div id="modal-reset" class="b-modal hidden" role="dialog" aria-modal="true" aria-label="إعادة تعيين رمز الدخول">
+    <div class="b-modal-card max-w-md">
+      <div class="flex items-center justify-between border-b border-navy-100 px-6 py-4">
+        <h3 class="font-display text-lg font-extrabold text-navy-900">إعادة تعيين رمز الدخول</h3>
+        <button onclick="closeModal('modal-reset')" class="rounded-lg p-1.5 text-navy-400 hover:bg-navy-50" aria-label="إغلاق">✕</button>
+      </div>
+      <div class="space-y-4 px-6 py-5 text-center">
+        <p class="text-sm font-bold leading-relaxed text-navy-500">
+          أُنشئ رمز مؤقت للمستخدم <span id="rs-name" class="text-navy-900"></span>. يُستخدم مرة واحدة ثم يُلزم بتعيين رمز جديد (محاكاة لبريد Supabase Auth).
+        </p>
+        <div class="flex items-center justify-center gap-3 rounded-xl border-2 border-dashed border-navy-200 py-5">
+          <code id="rs-code" dir="ltr" class="font-display text-2xl font-black tracking-widest text-gold-700">BRK-XXXXXX</code>
+          <button type="button" id="rs-copy" class="rounded-lg p-2 text-navy-700 transition-all hover:scale-110 hover:bg-gold-50" aria-label="نسخ الرمز">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+        <button type="button" id="rs-close" class="w-full rounded-md border border-gold-500/40 bg-navy-900 px-6 py-3 text-sm font-black text-gold-100 hover:bg-navy-800">تم</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ نافذة تأكيد الإيقاف/التفعيل ═══ -->
+  <div id="modal-confirm" class="b-modal hidden" role="dialog" aria-modal="true" aria-labelledby="cf-title">
+    <div class="b-modal-card max-w-md">
+      <div class="flex items-center justify-between border-b border-navy-100 px-6 py-4">
+        <h3 id="cf-title" class="font-display text-lg font-extrabold text-navy-900">تأكيد</h3>
+        <button onclick="closeModal('modal-confirm')" class="rounded-lg p-1.5 text-navy-400 hover:bg-navy-50" aria-label="إغلاق">✕</button>
+      </div>
+      <div class="space-y-5 px-6 py-5">
+        <p id="cf-text" class="text-sm font-bold leading-relaxed text-navy-500"></p>
+        <div class="flex justify-end gap-3 border-t border-navy-100 pt-4">
+          <button type="button" id="cf-cancel" class="rounded-md border border-navy-200 bg-white px-5 py-2.5 text-sm font-extrabold text-navy-700 hover:border-gold-500">تراجع</button>
+          <button type="button" id="cf-ok" class="rounded-md px-7 py-2.5 text-sm font-black">تأكيد</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+  <script src="modules.js"></script>
+  <script src="ui.js"></script>
+  <script src="auth.js"></script>
+  <script src="app.js"></script>
+  <script>
+    /* عناصر إضافية في الشريط العلوي/الجانبي */
+    document.addEventListener('DOMContentLoaded', () => {
+      const u = typeof currentUser === 'function' ? currentUser() : null;
+      if (!u) return;
+      const sn = document.getElementById('sidebar-user-name');
+      const sr = document.getElementById('sidebar-user-role');
+      const ta = document.getElementById('topbar-avatar');
+      if (sn) sn.textContent = u.full_name;
+      if (sr) sr.textContent = ROLE_LABELS[u.role];
+      if (ta) ta.textContent = u.full_name.charAt(0);
+    });
+  </script>
+</body>
+</html>

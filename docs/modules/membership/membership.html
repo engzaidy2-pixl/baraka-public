@@ -1,0 +1,1309 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>بركة | شؤون العضوية</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { cairo: ['"Cairo"', 'sans-serif'], tajawal: ['"Tajawal"', 'sans-serif'], display: ['"Tajawal"', '"Cairo"', 'sans-serif'] },
+          colors: {
+            navy: { 50:'#f2f5f9',100:'#e2e8f2',200:'#c9d4e6',300:'#a3b5d2',400:'#7790b8',500:'#58729f',600:'#455b85',700:'#394a6c',800:'#2c3a55',900:'#1d2740',950:'#10182b' },
+            gold: { 50:'#fbf7ea',100:'#f5ebc8',200:'#ead694',300:'#e0c064',400:'#d5ab3d',500:'#c9a227',600:'#a98420',700:'#86661d',800:'#6b511c',900:'#57421b' },
+            ivory: '#faf8f2',
+          }
+        }
+      }
+    }
+  </script>
+  
+  <link rel="stylesheet" href="../../style.css?v=20260922">
+  <link rel="stylesheet" href="membership.css?v=20260924">
+  
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="bg-ivory min-h-screen font-cairo text-navy-900 antialiased">
+
+  <div id="app-loading" class="app-loading" aria-hidden="true">
+    <div class="app-loading-content">
+      <div class="app-loading-logo">ع</div>
+      <div class="app-loading-title">شؤون العضوية</div>
+      <div class="app-loading-spinner"></div>
+      <div class="app-loading-text">جارٍ التحميل...</div>
+    </div>
+  </div>
+
+  <div id="mobile-overlay" onclick="toggleSidebar()" class="fixed inset-0 z-40 hidden bg-navy-950/40 backdrop-blur-sm lg:hidden"></div>
+
+  <div class="flex min-h-screen">
+    <aside id="sidebar" aria-label="التنقل" class="fixed inset-y-0 right-0 z-50 flex w-80 max-w-[85vw] translate-x-full flex-col border-l-2 border-gold-500/25 bg-navy-950 shadow-2xl transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0">
+      
+      <div class="flex items-center gap-3 border-b border-white/10 px-5 py-5">
+        <span id="sidebar-brand" class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 font-display text-xl font-black text-navy-950">ب</span>
+        <div class="min-w-0 leading-tight">
+          <p id="sidebar-assoc-name" class="truncate font-display text-[15px] font-black text-white">—</p>
+          <p class="text-[11px] font-bold text-gold-400">شؤون العضوية</p>
+        </div>
+        <button onclick="toggleSidebar()" class="mr-auto rounded-lg p-1.5 text-navy-300 hover:text-white lg:hidden" aria-label="إغلاق">✕</button>
+      </div>
+
+      <nav class="flex-1 overflow-y-auto px-3 py-4">
+        <div class="mb-4">
+          <a href="../../dashboard.html" class="flex w-full items-center gap-3 rounded-md border border-gold-500/30 bg-navy-900/50 px-3 py-2.5 text-sm font-bold text-gold-300 transition-all hover:bg-navy-800/60">
+            <span>←</span>
+            <span class="flex-1 text-start">العودة إلى النظام</span>
+          </a>
+        </div>
+
+        <div class="mb-2">
+          <p class="px-3 py-2 text-[11px] font-black tracking-wider text-gold-500/90">
+            <span class="inline-block h-1.5 w-1.5 rotate-45 bg-gold-500"></span>
+            وحدات العضوية
+          </p>
+          <ul class="space-y-0.5">
+            <li><button type="button" data-tab="dashboard" class="membership-nav-item w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-navy-200 transition-all hover:bg-white/5 hover:text-white">
+              <span>🏠</span><span class="flex-1 text-start">نظرة عامة</span>
+            </button></li>
+            <li><button type="button" data-tab="members" class="membership-nav-item w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-navy-200 transition-all hover:bg-white/5 hover:text-white">
+              <span>👥</span><span class="flex-1 text-start">الأعضاء</span>
+            </button></li>
+            <li><button type="button" data-tab="employers" class="membership-nav-item w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-navy-200 transition-all hover:bg-white/5 hover:text-white">
+              <span>🏢</span><span class="flex-1 text-start">جهات العمل</span>
+            </button></li>
+            <li><button type="button" data-tab="deduction-entities" class="membership-nav-item w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-navy-200 transition-all hover:bg-white/5 hover:text-white">
+              <span>🏛️</span><span class="flex-1 text-start">جهات الخصم</span>
+            </button></li>
+            <li><button type="button" data-tab="subscriptions" class="membership-nav-item w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-navy-200 transition-all hover:bg-white/5 hover:text-white">
+              <span>💰</span><span class="flex-1 text-start">الاشتراكات</span>
+            </button></li>
+            <li><button type="button" data-tab="deductions" class="membership-nav-item w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-navy-200 transition-all hover:bg-white/5 hover:text-white">
+              <span>📋</span><span class="flex-1 text-start">دفعات الخصم</span>
+            </button></li>
+            <li><button type="button" data-tab="reports" class="membership-nav-item w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-navy-200 transition-all hover:bg-white/5 hover:text-white">
+              <span>📊</span><span class="flex-1 text-start">التقارير</span>
+            </button></li>
+          </ul>
+        </div>
+      </nav>
+
+      <div class="border-t border-white/10 p-4">
+        <div class="mb-3 flex items-center gap-3">
+          <span id="user-avatar" class="flex h-10 w-10 items-center justify-center rounded-full bg-gold-500/15 font-display text-sm font-black text-gold-300">—</span>
+          <div class="min-w-0 leading-tight">
+            <p id="sidebar-user-name" class="truncate text-sm font-extrabold text-white">—</p>
+            <p id="sidebar-user-role" class="truncate text-[11px] font-bold text-gold-400">—</p>
+          </div>
+        </div>
+        <button onclick="logout()" class="flex w-full items-center justify-center gap-2 rounded-md border border-red-400/30 bg-red-900/30 px-4 py-2.5 text-sm font-extrabold text-red-200 transition-all hover:bg-red-900/50">
+          تسجيل الخروج
+        </button>
+      </div>
+    </aside>
+
+    <div class="flex min-w-0 flex-1 flex-col">
+      
+      <header class="sticky top-0 z-30 border-b-2 border-gold-500/30 bg-ivory/95 backdrop-blur-xl">
+        <div class="flex items-center gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
+          <button onclick="toggleSidebar()" class="rounded-xl bg-navy-900 p-2.5 text-gold-400 lg:hidden" aria-label="فتح القائمة">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+          </button>
+          <div class="min-w-0">
+            <h1 id="page-title" class="truncate font-display text-lg font-black text-navy-900 sm:text-xl">شؤون العضوية</h1>
+            <p class="hidden text-[11px] font-bold text-navy-500 sm:block"><span id="assoc-name-top">—</span> — مساحة العضوية</p>
+          </div>
+          <div class="ms-auto flex items-center gap-4">
+            <div class="hidden border-s border-gold-500/40 ps-4 text-end md:block">
+              <p id="date-hijri" class="text-[11px] font-black leading-tight text-gold-700">—</p>
+              <p id="date-gregorian" class="text-[11px] font-semibold leading-tight text-navy-500">—</p>
+            </div>
+            <div class="flex items-center gap-2.5 border-s border-gold-500/40 ps-4">
+              <div class="hidden text-end leading-tight min-[420px]:block">
+                <p id="user-name" class="text-[13px] font-black text-navy-900">—</p>
+                <p id="user-role" class="hidden text-[11px] font-bold text-gold-700 sm:block">—</p>
+              </div>
+              <span id="topbar-avatar" class="flex h-10 w-10 items-center justify-center rounded-full bg-navy-100 font-display text-sm font-black text-navy-800">—</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+
+        <!-- ═══ لوحة التحكم (صفحة الاستقبال) ═══ -->
+        <section id="tab-dashboard" class="tab-panel mx-auto max-w-6xl">
+
+          <!-- 1. بانر الترحيب -->
+          <div class="welcome-banner rounded-2xl bg-gradient-to-l from-navy-800 via-navy-900 to-navy-950 p-6 shadow-xl sm:p-8">
+            <div class="relative">
+              <h2 class="font-display text-2xl font-black leading-snug text-white sm:text-3xl">
+                مرحبًا، <span id="dashboard-username" class="text-gold-400">—</span> 👋
+              </h2>
+              <p class="mt-2 text-sm font-bold text-navy-200">نظرة عامة على شؤون العضوية — الأعضاء، الاشتراكات، ودفعات الخصم في مكان واحد.</p>
+            </div>
+          </div>
+
+          <!-- 2. البطاقات الإحصائية -->
+          <div class="stat-grid mt-6">
+            <div class="stat-card">
+              <div class="flex items-start justify-between gap-2">
+                <div class="stat-card-label">إجمالي الأعضاء</div>
+                <span class="stat-card-icon">👥</span>
+              </div>
+              <div class="stat-card-value" id="stat-total-members">—</div>
+              <p class="mt-1 text-[11px] font-bold text-navy-400">جميع الأعضاء المسجَّلين</p>
+            </div>
+
+            <div class="stat-card">
+              <div class="flex items-start justify-between gap-2">
+                <div class="stat-card-label">الأعضاء النشطون</div>
+                <span class="stat-card-icon">✅</span>
+              </div>
+              <div class="stat-card-value" id="stat-active-members">—</div>
+              <p class="mt-1 text-[11px] font-bold text-navy-400">بحالة نشطة حاليًا</p>
+            </div>
+
+            <div class="stat-card">
+              <div class="flex items-start justify-between gap-2">
+                <div class="stat-card-label">اشتراكات مستحقة</div>
+                <span class="stat-card-icon">⏳</span>
+              </div>
+              <div class="stat-card-value" id="stat-pending-subs">—</div>
+              <p class="mt-1 text-[11px] font-bold text-navy-400">الشهر الحالي (معلّق/جزئي)</p>
+            </div>
+
+            <div class="stat-card">
+              <div class="flex items-start justify-between gap-2">
+                <div class="stat-card-label">المحصَّل هذا الشهر</div>
+                <span class="stat-card-icon">💰</span>
+              </div>
+              <div class="stat-card-value text-gold-700" id="stat-collected-month">—</div>
+              <p class="mt-1 text-[11px] font-bold text-navy-400">إجمالي المدفوعات المسجَّلة</p>
+            </div>
+          </div>
+
+          <!-- 3. الإجراءات السريعة -->
+          <div class="quick-actions-grid mt-6">
+            <button type="button" class="quick-action" data-action="add-member">
+              <span class="text-3xl">➕</span>
+              <span class="font-bold">إضافة عضو</span>
+              <span class="quick-action-sub">تسجيل عضو جديد</span>
+            </button>
+            <button type="button" class="quick-action" data-action="view-members">
+              <span class="text-3xl">👥</span>
+              <span class="font-bold">عرض الأعضاء</span>
+              <span class="quick-action-sub">القائمة الكاملة مع البحث</span>
+            </button>
+            <button type="button" class="quick-action" data-action="add-subscription">
+              <span class="text-3xl">💰</span>
+              <span class="font-bold">تسجيل اشتراك</span>
+              <span class="quick-action-sub">سداد اشتراك لعضو</span>
+            </button>
+            <button type="button" class="quick-action" data-action="new-batch">
+              <span class="text-3xl">📋</span>
+              <span class="font-bold">دفعة خصم</span>
+              <span class="quick-action-sub">توليد خطاب مجمَّع</span>
+            </button>
+            <button type="button" class="quick-action" data-action="view-reports">
+              <span class="text-3xl">📊</span>
+              <span class="font-bold">التقارير</span>
+              <span class="quick-action-sub">تصدير Excel/PDF</span>
+            </button>
+          </div>
+
+          <!-- 4 + 5. التنبيهات وآخر الأنشطة -->
+          <div class="mt-6 grid gap-6 lg:grid-cols-2">
+
+            <!-- 4. التنبيهات -->
+            <div class="alerts-section">
+              <div class="mb-4 flex items-center gap-2 border-b-2 border-gold-500/30 pb-3">
+                <span class="text-xl">🔔</span>
+                <h3 class="font-display text-base font-black text-navy-900">تنبيهات مهمة</h3>
+              </div>
+              <div id="dashboard-alerts">
+                <div class="dashboard-empty">جارٍ تحميل التنبيهات...</div>
+              </div>
+            </div>
+
+            <!-- 5. آخر الأنشطة -->
+            <div class="recent-activity">
+              <div class="mb-4 flex items-center gap-2 border-b-2 border-gold-500/30 pb-3">
+                <span class="text-xl">🕒</span>
+                <h3 class="font-display text-base font-black text-navy-900">آخر الأنشطة</h3>
+              </div>
+              <div id="dashboard-recent">
+                <div class="dashboard-empty">جارٍ تحميل الأنشطة...</div>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- ═══ الأعضاء (tab-members) ═══ -->
+        <section id="tab-members" class="tab-panel mx-auto hidden max-w-7xl">
+
+          <!-- 1. شريط الأدوات (Toolbar) -->
+          <div class="members-toolbar">
+
+            <!-- 1.1 البحث الفوري + أزرار الإجراءات -->
+            <div class="members-toolbar-row">
+              <div class="members-search">
+                <span class="members-search-icon" aria-hidden="true">🔍</span>
+                <input
+                  type="search"
+                  id="members-search"
+                  class="members-search-input"
+                  placeholder="ابحث بالاسم، الجوال، الرقم القومي، الرقم الوظيفي…"
+                  autocomplete="off"
+                  aria-label="بحث فوري في الأعضاء">
+                <button type="button" id="members-search-clear" class="members-search-clear" hidden aria-label="مسح البحث">✕</button>
+              </div>
+
+              <div class="members-toolbar-actions">
+                <button type="button" id="btn-add-member" class="membership-btn membership-btn-accent membership-btn-sm">
+                  <span aria-hidden="true">➕</span> إضافة عضو
+                </button>
+                <button type="button" id="btn-import-members" class="membership-btn membership-btn-outline membership-btn-sm">
+                  <span aria-hidden="true">📥</span> استيراد Excel
+                </button>
+                <button type="button" id="btn-export-members" class="membership-btn membership-btn-outline membership-btn-sm">
+                  <span aria-hidden="true">📤</span> تصدير Excel
+                </button>
+                <input type="file" id="members-import-file" accept=".xlsx,.xls,.csv" class="hidden" aria-hidden="true">
+              </div>
+            </div>
+
+            <!-- 1.2 الفلاتر -->
+            <div class="members-filters">
+              <div class="members-filter">
+                <label class="membership-label" for="filter-membership-type">نوع العضوية</label>
+                <select id="filter-membership-type" class="membership-input" data-member-filter="membership_type_id">
+                  <option value="">كل الأنواع</option>
+                </select>
+              </div>
+
+              <div class="members-filter">
+                <label class="membership-label" for="filter-status">الحالة</label>
+                <select id="filter-status" class="membership-input" data-member-filter="status">
+                  <option value="">كل الحالات</option>
+                  <option value="active">نشط</option>
+                  <option value="suspended">موقوف</option>
+                  <option value="hidden">مخفي</option>
+                </select>
+              </div>
+
+              <div class="members-filter">
+                <label class="membership-label" for="filter-employer">جهة العمل</label>
+                <select id="filter-employer" class="membership-input" data-member-filter="employer_id">
+                  <option value="">كل الجهات</option>
+                </select>
+              </div>
+
+              <div class="members-filter">
+                <label class="membership-label" for="filter-service-status">الحالة بالخدمة</label>
+                <select id="filter-service-status" class="membership-input" data-member-filter="service_status">
+                  <option value="">الجميع</option>
+                  <option value="active">على رأس العمل</option>
+                  <option value="retired">متقاعد</option>
+                  <option value="other">أخرى</option>
+                </select>
+              </div>
+
+              <div class="members-filter members-filter-reset">
+                <button type="button" id="btn-reset-member-filters" class="membership-btn membership-btn-outline membership-btn-sm">
+                  <span aria-hidden="true">↺</span> مسح الفلاتر
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. ملخص النتائج -->
+          <div class="members-meta">
+            <p class="members-count" id="members-count">—</p>
+            <div class="members-active-filters" id="members-active-filters"></div>
+          </div>
+
+          <!-- 3. جدول الأعضاء -->
+          <div class="members-table-wrapper" id="members-table-wrapper">
+            <table class="members-table" id="members-table">
+              <thead>
+                <tr>
+                  <th scope="col">رقم العضوية</th>
+                  <th scope="col">الاسم</th>
+                  <th scope="col">الجوال</th>
+                  <th scope="col">نوع العضوية</th>
+                  <th scope="col">جهة العمل</th>
+                  <th scope="col">الحالة</th>
+                  <th scope="col" class="members-th-actions">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="members-tbody"></tbody>
+            </table>
+          </div>
+
+          <!-- 4. الحالة الفارغة -->
+          <div class="members-empty" id="members-empty" hidden>
+            <div class="members-empty-icon" aria-hidden="true">👥</div>
+            <h3 class="members-empty-title">لا يوجد أعضاء</h3>
+            <p class="members-empty-text" id="members-empty-text">
+              لم يُسجَّل أي عضو بعد — ابدأ بإضافة عضو جديد أو استيراد القائمة من ملف Excel.
+            </p>
+            <button type="button" class="membership-btn membership-btn-accent membership-btn-sm" data-member-action="add">
+              <span aria-hidden="true">➕</span> إضافة أول عضو
+            </button>
+          </div>
+
+          <!-- 5. الترقيم -->
+          <div class="pagination" id="members-pagination"></div>
+
+          <!-- 6. نافذة إضافة / تعديل عضو -->
+          <div id="member-modal" class="membership-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="member-modal-title">
+            <div class="membership-modal" style="max-width: 40rem;">
+              <div class="membership-modal-header">
+                <h3 class="membership-modal-title" id="member-modal-title">إضافة عضو</h3>
+                <button type="button" class="membership-btn membership-btn-outline membership-btn-sm" data-close-member-modal aria-label="إغلاق">✕</button>
+              </div>
+
+              <div class="membership-modal-body">
+                <form id="member-form" class="member-form" novalidate>
+                  <input type="hidden" id="member-id">
+
+                  <div class="member-form-grid">
+                    <div class="member-field member-field-full">
+                      <label class="membership-label" for="member-full-name">الاسم الكامل <span class="required">*</span></label>
+                      <input type="text" id="member-full-name" class="membership-input" autocomplete="off">
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="member-national-id">الرقم القومي</label>
+                      <input type="text" id="member-national-id" class="membership-input" inputmode="numeric" autocomplete="off">
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="member-phone">الجوال</label>
+                      <input type="tel" id="member-phone" class="membership-input" dir="ltr" autocomplete="off">
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="member-number-input">رقم العضوية</label>
+                      <input type="text" id="member-number-input" class="membership-input" placeholder="يُولَّد تلقائيًا" autocomplete="off">
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="member-employee-number">الرقم الوظيفي</label>
+                      <input type="text" id="member-employee-number" class="membership-input" autocomplete="off">
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="member-type">نوع العضوية</label>
+                      <select id="member-type" class="membership-input"></select>
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="member-employer">جهة العمل</label>
+                      <select id="member-employer" class="membership-input"></select>
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="member-service-status">الحالة بالخدمة</label>
+                      <select id="member-service-status" class="membership-input">
+                        <option value="active">على رأس العمل</option>
+                        <option value="retired">متقاعد</option>
+                        <option value="other">أخرى</option>
+                      </select>
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="member-status">حالة العضوية</label>
+                      <select id="member-status" class="membership-input">
+                        <option value="active">نشط</option>
+                        <option value="suspended">موقوف</option>
+                        <option value="hidden">مخفي</option>
+                      </select>
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="member-date">تاريخ العضوية</label>
+                      <input type="date" id="member-date" class="membership-input">
+                    </div>
+                  </div>
+
+                  <p class="member-form-error" id="member-form-error" hidden></p>
+                </form>
+              </div>
+
+              <div class="membership-modal-footer">
+                <button type="button" class="membership-btn membership-btn-outline" data-close-member-modal>إلغاء</button>
+                <button type="button" class="membership-btn membership-btn-accent" id="btn-save-member">حفظ</button>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+<section id="tab-employers" class="tab-panel mx-auto hidden max-w-6xl">
+
+  <!-- 1. شريط الأدوات (Toolbar) -->
+  <div class="members-toolbar">
+
+    <!-- 1.1 البحث الفوري + زر الإضافة -->
+    <div class="members-toolbar-row">
+      <div class="members-search">
+        <span class="members-search-icon" aria-hidden="true">🔍</span>
+        <input
+          type="search"
+          id="employers-search"
+          class="members-search-input"
+          placeholder="ابحث بالاسم، الرمز، المسؤول، الهاتف…"
+          autocomplete="off"
+          aria-label="بحث فوري في جهات العمل">
+        <button type="button" id="employers-search-clear" class="members-search-clear" hidden aria-label="مسح البحث">✕</button>
+      </div>
+
+      <div class="members-toolbar-actions">
+        <button type="button" id="btn-add-employer" class="membership-btn membership-btn-accent membership-btn-sm">
+          <span aria-hidden="true">➕</span> إضافة جهة عمل
+        </button>
+      </div>
+    </div>
+
+    <!-- 1.2 الفلاتر -->
+    <div class="members-filters">
+      <div class="members-filter">
+        <label class="membership-label" for="filter-employers-status">الحالة</label>
+        <select id="filter-employers-status" class="membership-input" data-employer-filter="status">
+          <option value="">كل الحالات</option>
+          <option value="active">نشط</option>
+          <option value="inactive">غير نشط</option>
+        </select>
+      </div>
+
+      <div class="members-filter members-filter-reset">
+        <button type="button" id="btn-reset-employers-filters" class="membership-btn membership-btn-outline membership-btn-sm">
+          <span aria-hidden="true">↺</span> مسح الفلاتر
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. ملخص النتائج -->
+  <div class="members-meta">
+    <p class="members-count" id="employers-count">—</p>
+    <div class="members-active-filters" id="employers-active-filters"></div>
+  </div>
+
+  <!-- 3. جدول جهات العمل -->
+  <div class="members-table-wrapper" id="employers-table-wrapper">
+    <table class="members-table" id="employers-table">
+      <thead>
+        <tr>
+          <th scope="col">الاسم</th>
+          <th scope="col">الرمز</th>
+          <th scope="col">المسؤول</th>
+          <th scope="col">الهاتف</th>
+          <th scope="col">الحالة</th>
+          <th scope="col" class="members-th-actions">إجراءات</th>
+        </tr>
+      </thead>
+      <tbody id="employers-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- 4. الحالة الفارغة -->
+  <div class="members-empty" id="employers-empty" hidden>
+    <div class="members-empty-icon" aria-hidden="true">🏢</div>
+    <h3 class="members-empty-title">لا توجد جهات عمل</h3>
+    <p class="members-empty-text" id="employers-empty-text">
+      لم تُسجَّل أي جهة عمل بعد — ابدأ بإضافة جهة عمل جديدة.
+    </p>
+    <button type="button" class="membership-btn membership-btn-accent membership-btn-sm" data-employer-action="add">
+      <span aria-hidden="true">➕</span> إضافة أول جهة عمل
+    </button>
+  </div>
+
+  <!-- 5. نافذة إضافة / تعديل جهة عمل -->
+  <div id="employer-modal" class="membership-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="employer-modal-title">
+    <div class="membership-modal" style="max-width: 36rem;">
+      <div class="membership-modal-header">
+        <h3 class="membership-modal-title" id="employer-modal-title">إضافة جهة عمل</h3>
+        <button type="button" class="membership-btn membership-btn-outline membership-btn-sm" data-close-employer-modal aria-label="إغلاق">✕</button>
+      </div>
+
+      <div class="membership-modal-body">
+        <form id="employer-form" class="member-form" novalidate>
+          <input type="hidden" id="employer-id">
+
+          <div class="member-form-grid">
+            <div class="member-field member-field-full">
+              <label class="membership-label" for="employer-name">الاسم <span class="required">*</span></label>
+              <input type="text" id="employer-name" class="membership-input" autocomplete="off">
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="employer-code">الرمز</label>
+              <input type="text" id="employer-code" class="membership-input" placeholder="مثال: EDU-001" autocomplete="off">
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="employer-address">العنوان</label>
+              <input type="text" id="employer-address" class="membership-input" autocomplete="off">
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="employer-phone">الهاتف</label>
+              <input type="tel" id="employer-phone" class="membership-input" dir="ltr" autocomplete="off">
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="employer-contact">المسؤول</label>
+              <input type="text" id="employer-contact" class="membership-input" autocomplete="off">
+            </div>
+
+            <div class="member-field member-field-full">
+              <label class="membership-label" for="employer-status">الحالة</label>
+              <select id="employer-status" class="membership-input">
+                <option value="active">نشط</option>
+                <option value="inactive">غير نشط</option>
+              </select>
+            </div>
+          </div>
+
+          <p class="member-form-error" id="employer-form-error" hidden></p>
+        </form>
+      </div>
+
+      <div class="membership-modal-footer">
+        <button type="button" class="membership-btn membership-btn-outline" data-close-employer-modal>إلغاء</button>
+        <button type="button" class="membership-btn membership-btn-accent" id="btn-save-employer">حفظ</button>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<section id="tab-deduction-entities" class="tab-panel mx-auto hidden max-w-6xl">
+
+  <!-- 1. شريط الأدوات (Toolbar) -->
+  <div class="members-toolbar">
+
+    <!-- 1.1 البحث الفوري + زر الإضافة -->
+    <div class="members-toolbar-row">
+      <div class="members-search">
+        <span class="members-search-icon" aria-hidden="true">🔍</span>
+        <input
+          type="search"
+          id="entities-search"
+          class="members-search-input"
+          placeholder="ابحث بالاسم، الرمز، المسؤول، الهاتف، البريد…"
+          autocomplete="off"
+          aria-label="بحث فوري في جهات الخصم">
+        <button type="button" id="entities-search-clear" class="members-search-clear" hidden aria-label="مسح البحث">✕</button>
+      </div>
+
+      <div class="members-toolbar-actions">
+        <button type="button" id="btn-add-entity" class="membership-btn membership-btn-accent membership-btn-sm">
+          <span aria-hidden="true">➕</span> إضافة جهة خصم
+        </button>
+      </div>
+    </div>
+
+    <!-- 1.2 الفلاتر -->
+    <div class="members-filters">
+      <div class="members-filter">
+        <label class="membership-label" for="filter-entities-status">الحالة</label>
+        <select id="filter-entities-status" class="membership-input" data-entity-filter="status">
+          <option value="">كل الحالات</option>
+          <option value="active">نشط</option>
+          <option value="inactive">غير نشط</option>
+        </select>
+      </div>
+
+      <div class="members-filter members-filter-reset">
+        <button type="button" id="btn-reset-entities-filters" class="membership-btn membership-btn-outline membership-btn-sm">
+          <span aria-hidden="true">↺</span> مسح الفلاتر
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. ملخص النتائج -->
+  <div class="members-meta">
+    <p class="members-count" id="entities-count">—</p>
+    <div class="members-active-filters" id="entities-active-filters"></div>
+  </div>
+
+  <!-- 3. جدول جهات الخصم -->
+  <div class="members-table-wrapper" id="entities-table-wrapper">
+    <table class="members-table" id="entities-table">
+      <thead>
+        <tr>
+          <th scope="col">الاسم</th>
+          <th scope="col">الرمز</th>
+          <th scope="col">المسؤول</th>
+          <th scope="col">الهاتف</th>
+          <th scope="col">البريد</th>
+          <th scope="col">الحالة</th>
+          <th scope="col" class="members-th-actions">إجراءات</th>
+        </tr>
+      </thead>
+      <tbody id="entities-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- 4. الحالة الفارغة -->
+  <div class="members-empty" id="entities-empty" hidden>
+    <div class="members-empty-icon" aria-hidden="true">🏛️</div>
+    <h3 class="members-empty-title">لا توجد جهات خصم</h3>
+    <p class="members-empty-text" id="entities-empty-text">
+      لم تُسجَّل أي جهة خصم بعد — ابدأ بإضافة جهة خصم جديدة (إدارة استحقاقات تُخاطَب بخطابات الخصم).
+    </p>
+    <button type="button" class="membership-btn membership-btn-accent membership-btn-sm" data-entity-action="add">
+      <span aria-hidden="true">➕</span> إضافة أول جهة خصم
+    </button>
+  </div>
+
+  <!-- 5. نافذة إضافة / تعديل جهة خصم -->
+  <div id="entity-modal" class="membership-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="entity-modal-title">
+    <div class="membership-modal" style="max-width: 36rem;">
+      <div class="membership-modal-header">
+        <h3 class="membership-modal-title" id="entity-modal-title">إضافة جهة خصم</h3>
+        <button type="button" class="membership-btn membership-btn-outline membership-btn-sm" data-close-entity-modal aria-label="إغلاق">✕</button>
+      </div>
+
+      <div class="membership-modal-body">
+        <form id="entity-form" class="member-form" novalidate>
+          <input type="hidden" id="entity-id">
+
+          <div class="member-form-grid">
+            <div class="member-field member-field-full">
+              <label class="membership-label" for="entity-name">الاسم <span class="required">*</span></label>
+              <input type="text" id="entity-name" class="membership-input" autocomplete="off">
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="entity-code">الرمز</label>
+              <input type="text" id="entity-code" class="membership-input" placeholder="مثال: MOF-001" autocomplete="off">
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="entity-address">العنوان</label>
+              <input type="text" id="entity-address" class="membership-input" autocomplete="off">
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="entity-phone">الهاتف</label>
+              <input type="tel" id="entity-phone" class="membership-input" dir="ltr" autocomplete="off">
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="entity-email">البريد</label>
+              <input type="email" id="entity-email" class="membership-input" dir="ltr" autocomplete="off">
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="entity-contact">المسؤول</label>
+              <input type="text" id="entity-contact" class="membership-input" autocomplete="off">
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="entity-status">الحالة</label>
+              <select id="entity-status" class="membership-input">
+                <option value="active">نشط</option>
+                <option value="inactive">غير نشط</option>
+              </select>
+            </div>
+          </div>
+
+          <p class="member-form-error" id="entity-form-error" hidden></p>
+        </form>
+      </div>
+
+      <div class="membership-modal-footer">
+        <button type="button" class="membership-btn membership-btn-outline" data-close-entity-modal>إلغاء</button>
+        <button type="button" class="membership-btn membership-btn-accent" id="btn-save-entity">حفظ</button>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+        <section id="tab-subscriptions" class="tab-panel mx-auto hidden max-w-7xl">
+
+  <!-- 1. شريط الأدوات (Toolbar) -->
+  <div class="members-toolbar">
+
+    <div class="members-toolbar-row">
+      <div class="members-search">
+        <span class="members-search-icon" aria-hidden="true">🔍</span>
+        <input type="search" id="subs-search" class="members-search-input" placeholder="ابحث برقم العضوية، الاسم، رقم السند…" autocomplete="off">
+        <button type="button" id="subs-search-clear" class="members-search-clear" hidden aria-label="مسح البحث">✕</button>
+      </div>
+
+      <div class="members-toolbar-actions">
+        <button type="button" id="btn-add-sub" class="membership-btn membership-btn-accent membership-btn-sm">
+          <span aria-hidden="true">➕</span> إضافة اشتراك
+        </button>
+        <button type="button" id="btn-bulk-sub" class="membership-btn membership-btn-outline membership-btn-sm">
+          <span aria-hidden="true">⚡</span> إجراء تجميعي
+        </button>
+        <button type="button" id="btn-export-subs" class="membership-btn membership-btn-outline membership-btn-sm">
+          <span aria-hidden="true">📤</span> تصدير Excel
+        </button>
+      </div>
+    </div>
+
+    <div class="members-filters">
+      <div class="members-filter">
+        <label class="membership-label" for="filter-subs-year">السنة</label>
+        <select id="filter-subs-year" class="membership-input" data-sub-filter="period_year">
+          <option value="">كل السنوات</option>
+          <option value="2026">2026</option>
+          <option value="2025">2025</option>
+          <option value="2024">2024</option>
+          <option value="2023">2023</option>
+          <option value="2022">2022</option>
+          <option value="2021">2021</option>
+          <option value="2020">2020</option>
+        </select>
+      </div>
+
+      <div class="members-filter">
+        <label class="membership-label" for="filter-subs-month">الشهر</label>
+        <select id="filter-subs-month" class="membership-input" data-sub-filter="period_month">
+          <option value="">كل الأشهر</option>
+          <option value="1">يناير</option>
+          <option value="2">فبراير</option>
+          <option value="3">مارس</option>
+          <option value="4">أبريل</option>
+          <option value="5">مايو</option>
+          <option value="6">يونيو</option>
+          <option value="7">يوليو</option>
+          <option value="8">أغسطس</option>
+          <option value="9">سبتمبر</option>
+          <option value="10">أكتوبر</option>
+          <option value="11">نوفمبر</option>
+          <option value="12">ديسمبر</option>
+        </select>
+      </div>
+
+      <div class="members-filter">
+        <label class="membership-label" for="filter-subs-status">الحالة</label>
+        <select id="filter-subs-status" class="membership-input" data-sub-filter="status">
+          <option value="">كل الحالات</option>
+          <option value="pending">غير مدفوع</option>
+          <option value="partial">جزئي</option>
+          <option value="paid">مدفوع</option>
+        </select>
+      </div>
+
+      <div class="members-filter">
+        <label class="membership-label" for="filter-subs-method">طريقة الدفع</label>
+        <select id="filter-subs-method" class="membership-input" data-sub-filter="payment_method">
+          <option value="">كل الطرق</option>
+          <option value="cash">نقدي</option>
+          <option value="salary_deduction">خصم راتب</option>
+          <option value="bank_transfer">تحويل</option>
+        </select>
+      </div>
+
+      <div class="members-filter members-filter-reset">
+        <button type="button" id="btn-reset-subs-filters" class="membership-btn membership-btn-outline membership-btn-sm">
+          <span aria-hidden="true">↺</span> مسح الفلاتر
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-grid mt-6">
+    <div class="stat-card">
+      <div class="flex items-start justify-between gap-2">
+        <div class="stat-card-label">الإجمالي المطلوب</div>
+        <span class="stat-card-icon">🧾</span>
+      </div>
+      <div class="stat-card-value" id="subs-sum-total">—</div>
+      <p class="mt-1 text-[11px] font-bold text-navy-400">مجموع مبالغ الاشتراكات المعروضة</p>
+    </div>
+
+    <div class="stat-card">
+      <div class="flex items-start justify-between gap-2">
+        <div class="stat-card-label">المحصَّل</div>
+        <span class="stat-card-icon">💰</span>
+      </div>
+      <div class="stat-card-value text-gold-700" id="subs-sum-paid">—</div>
+      <p class="mt-1 text-[11px] font-bold text-navy-400">إجمالي المبالغ المدفوعة</p>
+    </div>
+
+    <div class="stat-card">
+      <div class="flex items-start justify-between gap-2">
+        <div class="stat-card-label">المتأخر</div>
+        <span class="stat-card-icon">⏳</span>
+      </div>
+      <div class="stat-card-value" id="subs-sum-remaining">—</div>
+      <p class="mt-1 text-[11px] font-bold text-navy-400">الفرق بين المطلوب والمحصَّل</p>
+    </div>
+
+    <div class="stat-card">
+      <div class="flex items-start justify-between gap-2">
+        <div class="stat-card-label">نسبة التحصيل</div>
+        <span class="stat-card-icon">📈</span>
+      </div>
+      <div class="stat-card-value" id="subs-sum-rate">—</div>
+      <p class="mt-1 text-[11px] font-bold text-navy-400">المحصَّل ÷ الإجمالي المطلوب</p>
+    </div>
+  </div>
+
+  <div class="members-table-wrapper" id="subs-table-wrapper">
+    <table class="members-table" id="subs-table">
+      <thead>
+        <tr>
+          <th scope="col">رقم العضوية</th>
+          <th scope="col">الاسم</th>
+          <th scope="col">السنة</th>
+          <th scope="col">الشهر</th>
+          <th scope="col">النوع</th>
+          <th scope="col">المبلغ</th>
+          <th scope="col">المدفوع</th>
+          <th scope="col">الحالة</th>
+          <th scope="col">طريقة الدفع</th>
+          <th scope="col" class="members-th-actions">إجراءات</th>
+        </tr>
+      </thead>
+      <tbody id="subs-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="members-empty" id="subs-empty" hidden>
+    <div class="members-empty-icon" aria-hidden="true">💰</div>
+    <h3 class="members-empty-title">لا توجد اشتراكات</h3>
+    <p class="members-empty-text" id="subs-empty-text">
+      لم يُسجَّل أي اشتراك بعد — ابدأ بإضافة اشتراك يدويًا أو نفِّذ إجراءً تجميعيًا لتوليد اشتراكات الفترة.
+    </p>
+    <button type="button" class="membership-btn membership-btn-accent membership-btn-sm" data-sub-action="add">
+      <span aria-hidden="true">➕</span> إضافة أول اشتراك
+    </button>
+  </div>
+
+  <div class="pagination" id="subs-pagination"></div>
+
+  <div id="sub-modal" class="membership-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="sub-modal-title">
+    <div class="membership-modal" style="max-width: 40rem;">
+      <div class="membership-modal-header">
+        <h3 class="membership-modal-title" id="sub-modal-title">إضافة اشتراك</h3>
+        <button type="button" class="membership-btn membership-btn-outline membership-btn-sm" data-close-sub-modal aria-label="إغلاق">✕</button>
+      </div>
+
+      <div class="membership-modal-body">
+        <form id="sub-form" class="member-form" novalidate>
+          <input type="hidden" id="sub-id">
+
+          <div class="member-form-grid">
+            <div class="member-field member-field-full">
+              <label class="membership-label" for="sub-member">العضو <span class="required">*</span></label>
+              <select id="sub-member" class="membership-input">
+                <option value="">— اختر العضو —</option>
+              </select>
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="sub-year">السنة <span class="required">*</span></label>
+              <select id="sub-year" class="membership-input">
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+                <option value="2022">2022</option>
+                <option value="2021">2021</option>
+                <option value="2020">2020</option>
+              </select>
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="sub-month">الشهر <span class="required">*</span></label>
+              <select id="sub-month" class="membership-input">
+                <option value="1">يناير</option>
+                <option value="2">فبراير</option>
+                <option value="3">مارس</option>
+                <option value="4">أبريل</option>
+                <option value="5">مايو</option>
+                <option value="6">يونيو</option>
+                <option value="7">يوليو</option>
+                <option value="8">أغسطس</option>
+                <option value="9">سبتمبر</option>
+                <option value="10">أكتوبر</option>
+                <option value="11">نوفمبر</option>
+                <option value="12">ديسمبر</option>
+              </select>
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="sub-frequency">النوع</label>
+              <select id="sub-frequency" class="membership-input">
+                <option value="monthly">شهري</option>
+                <option value="annual">سنوي</option>
+              </select>
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="sub-amount">المبلغ <span class="required">*</span></label>
+              <input type="number" id="sub-amount" class="membership-input" min="0" step="0.01" dir="ltr" autocomplete="off">
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="sub-paid-amount">المدفوع</label>
+              <input type="number" id="sub-paid-amount" class="membership-input" min="0" step="0.01" dir="ltr" autocomplete="off">
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="sub-payment-method">طريقة الدفع</label>
+              <select id="sub-payment-method" class="membership-input">
+                <option value="">— بدون —</option>
+                <option value="cash">نقدي</option>
+                <option value="salary_deduction">خصم راتب</option>
+                <option value="bank_transfer">تحويل</option>
+              </select>
+            </div>
+
+            <div class="member-field">
+              <label class="membership-label" for="sub-receipt-number">رقم السند</label>
+              <input type="text" id="sub-receipt-number" class="membership-input" placeholder="مثال: RCP-2026-0001" autocomplete="off">
+            </div>
+
+            <div class="member-field member-field-full">
+              <label class="membership-label" for="sub-notes">ملاحظات</label>
+              <textarea id="sub-notes" class="membership-input" rows="2" autocomplete="off"></textarea>
+            </div>
+          </div>
+
+          <p class="member-form-error" id="sub-form-error" hidden></p>
+        </form>
+      </div>
+
+      <div class="membership-modal-footer">
+        <button type="button" class="membership-btn membership-btn-outline" data-close-sub-modal>إلغاء</button>
+        <button type="button" class="membership-btn membership-btn-accent" id="btn-save-sub">حفظ</button>
+      </div>
+    </div>
+  </div>
+
+</section>
+        <!-- ═══ دفعات الخصم (tab-deductions) ═══ -->
+        <section id="tab-deductions" class="tab-panel mx-auto hidden max-w-7xl">
+
+          <!-- 1. شريط الأدوات (Toolbar) -->
+          <div class="members-toolbar">
+
+            <!-- 1.1 البحث الفوري + أزرار الإجراءات -->
+            <div class="members-toolbar-row">
+              <div class="members-search">
+                <span class="members-search-icon" aria-hidden="true">🔍</span>
+                <input
+                  type="search"
+                  id="batches-search"
+                  class="members-search-input"
+                  placeholder="ابحث برقم الدفعة…"
+                  autocomplete="off"
+                  aria-label="بحث فوري في دفعات الخصم">
+                <button type="button" id="batches-search-clear" class="members-search-clear" hidden aria-label="مسح البحث">✕</button>
+              </div>
+
+              <div class="members-toolbar-actions">
+                <button type="button" id="btn-add-batch" class="membership-btn membership-btn-accent membership-btn-sm">
+                  <span aria-hidden="true">➕</span> دفعة جديدة
+                </button>
+                <button type="button" id="btn-bulk-batch" class="membership-btn membership-btn-outline membership-btn-sm">
+                  <span aria-hidden="true">⚡</span> إجراء تجميعي
+                </button>
+                <button type="button" id="btn-export-batches" class="membership-btn membership-btn-outline membership-btn-sm">
+                  <span aria-hidden="true">📤</span> تصدير
+                </button>
+              </div>
+            </div>
+
+            <!-- 1.2 الفلاتر -->
+            <div class="members-filters">
+              <div class="members-filter">
+                <label class="membership-label" for="filter-batches-year">السنة</label>
+                <select id="filter-batches-year" class="membership-input" data-batch-filter="period_year">
+                  <option value="">كل السنوات</option>
+                  <option value="2026">2026</option>
+                  <option value="2025">2025</option>
+                  <option value="2024">2024</option>
+                  <option value="2023">2023</option>
+                  <option value="2022">2022</option>
+                  <option value="2021">2021</option>
+                  <option value="2020">2020</option>
+                </select>
+              </div>
+
+              <div class="members-filter">
+                <label class="membership-label" for="filter-batches-month">الشهر</label>
+                <select id="filter-batches-month" class="membership-input" data-batch-filter="period_month">
+                  <option value="">كل الأشهر</option>
+                  <option value="1">يناير</option>
+                  <option value="2">فبراير</option>
+                  <option value="3">مارس</option>
+                  <option value="4">أبريل</option>
+                  <option value="5">مايو</option>
+                  <option value="6">يونيو</option>
+                  <option value="7">يوليو</option>
+                  <option value="8">أغسطس</option>
+                  <option value="9">سبتمبر</option>
+                  <option value="10">أكتوبر</option>
+                  <option value="11">نوفمبر</option>
+                  <option value="12">ديسمبر</option>
+                </select>
+              </div>
+
+              <div class="members-filter">
+                <label class="membership-label" for="filter-batches-method">النوع</label>
+                <select id="filter-batches-method" class="membership-input" data-batch-filter="payment_method">
+                  <option value="">كل الأنواع</option>
+                  <option value="salary_deduction">خصم راتب</option>
+                  <option value="cash_demand">مطالبة نقدية</option>
+                </select>
+              </div>
+
+              <div class="members-filter">
+                <label class="membership-label" for="filter-batches-status">الحالة</label>
+                <select id="filter-batches-status" class="membership-input" data-batch-filter="status">
+                  <option value="">كل الحالات</option>
+                  <option value="draft">مسودة</option>
+                  <option value="sent">مُرسلة</option>
+                  <option value="completed">مكتملة</option>
+                  <option value="cancelled">ملغاة</option>
+                </select>
+              </div>
+
+              <div class="members-filter members-filter-reset">
+                <button type="button" id="btn-reset-batches-filters" class="membership-btn membership-btn-outline membership-btn-sm">
+                  <span aria-hidden="true">↺</span> مسح الفلاتر
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. ملخص الدفعات -->
+          <div class="stat-grid mt-6">
+            <div class="stat-card">
+              <div class="flex items-start justify-between gap-2">
+                <div class="stat-card-label">إجمالي الدفعات</div>
+                <span class="stat-card-icon">📦</span>
+              </div>
+              <div class="stat-card-value" id="batches-sum-total">—</div>
+              <p class="mt-1 text-[11px] font-bold text-navy-400">جميع الدفعات المعروضة</p>
+            </div>
+
+            <div class="stat-card">
+              <div class="flex items-start justify-between gap-2">
+                <div class="stat-card-label">دفعات خصم راتب</div>
+                <span class="stat-card-icon">🏢</span>
+              </div>
+              <div class="stat-card-value" id="batches-sum-deduction">—</div>
+              <p class="mt-1 text-[11px] font-bold text-navy-400">مُجمَّعة لكل جهة خصم</p>
+            </div>
+
+            <div class="stat-card">
+              <div class="flex items-start justify-between gap-2">
+                <div class="stat-card-label">دفعات مطالبة نقدية</div>
+                <span class="stat-card-icon">💵</span>
+              </div>
+              <div class="stat-card-value" id="batches-sum-cash">—</div>
+              <p class="mt-1 text-[11px] font-bold text-navy-400">بدون جهة خصم</p>
+            </div>
+
+            <div class="stat-card">
+              <div class="flex items-start justify-between gap-2">
+                <div class="stat-card-label">إجمالي المبالغ</div>
+                <span class="stat-card-icon">💰</span>
+              </div>
+              <div class="stat-card-value text-gold-700" id="batches-sum-amount">—</div>
+              <p class="mt-1 text-[11px] font-bold text-navy-400">مجموع إجماليات الدفعات المعروضة</p>
+            </div>
+          </div>
+
+          <!-- 3. جدول الدفعات -->
+          <div class="members-table-wrapper" id="batches-table-wrapper">
+            <table class="members-table" id="batches-table">
+              <thead>
+                <tr>
+                  <th scope="col">رقم الدفعة</th>
+                  <th scope="col">الشهر</th>
+                  <th scope="col">السنة</th>
+                  <th scope="col">النوع</th>
+                  <th scope="col">جهة الخصم</th>
+                  <th scope="col">عدد الأعضاء</th>
+                  <th scope="col">الإجمالي</th>
+                  <th scope="col">الحالة</th>
+                  <th scope="col" class="members-th-actions">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="batches-tbody"></tbody>
+            </table>
+          </div>
+
+          <!-- 4. الحالة الفارغة -->
+          <div class="members-empty" id="batches-empty" hidden>
+            <div class="members-empty-icon" aria-hidden="true">📦</div>
+            <h3 class="members-empty-title">لا توجد دفعات</h3>
+            <p class="members-empty-text" id="batches-empty-text">
+              لم تُولَّد أي دفعة خصم بعد — أنشئ دفعة يدويًا أو نفِّذ إجراءً تجميعيًا لتجميع أعضاء الشهر في دفعة واحدة لكل جهة خصم.
+            </p>
+            <button type="button" class="membership-btn membership-btn-accent membership-btn-sm" data-batch-action="add">
+              <span aria-hidden="true">➕</span> إضافة أول دفعة
+            </button>
+          </div>
+
+          <!-- 5. الترقيم -->
+          <div class="pagination" id="batches-pagination"></div>
+
+          <!-- 6. نافذة عرض / تعديل دفعة -->
+          <div id="batch-modal" class="membership-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="batch-modal-title">
+            <div class="membership-modal" style="max-width: 56rem;">
+              <div class="membership-modal-header">
+                <h3 class="membership-modal-title" id="batch-modal-title">دفعة جديدة</h3>
+                <button type="button" class="membership-btn membership-btn-outline membership-btn-sm" data-close-batch-modal aria-label="إغلاق">✕</button>
+              </div>
+
+              <div class="membership-modal-body">
+                <form id="batch-form" class="member-form" novalidate>
+                  <input type="hidden" id="batch-id">
+
+                  <div class="member-form-grid">
+                    <div class="member-field">
+                      <label class="membership-label" for="batch-number">رقم الدفعة <span class="required">*</span></label>
+                      <input type="text" id="batch-number" class="membership-input" placeholder="مثال: B-2026-09-001" autocomplete="off">
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="batch-status">الحالة</label>
+                      <select id="batch-status" class="membership-input">
+                        <option value="draft">مسودة</option>
+                        <option value="sent">مُرسلة</option>
+                        <option value="completed">مكتملة</option>
+                        <option value="cancelled">ملغاة</option>
+                      </select>
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="batch-year">السنة <span class="required">*</span></label>
+                      <select id="batch-year" class="membership-input">
+                        <option value="2026">2026</option>
+                        <option value="2025">2025</option>
+                        <option value="2024">2024</option>
+                        <option value="2023">2023</option>
+                        <option value="2022">2022</option>
+                        <option value="2021">2021</option>
+                        <option value="2020">2020</option>
+                      </select>
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="batch-month">الشهر <span class="required">*</span></label>
+                      <select id="batch-month" class="membership-input">
+                        <option value="1">يناير</option>
+                        <option value="2">فبراير</option>
+                        <option value="3">مارس</option>
+                        <option value="4">أبريل</option>
+                        <option value="5">مايو</option>
+                        <option value="6">يونيو</option>
+                        <option value="7">يوليو</option>
+                        <option value="8">أغسطس</option>
+                        <option value="9">سبتمبر</option>
+                        <option value="10">أكتوبر</option>
+                        <option value="11">نوفمبر</option>
+                        <option value="12">ديسمبر</option>
+                      </select>
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="batch-method">النوع <span class="required">*</span></label>
+                      <select id="batch-method" class="membership-input">
+                        <option value="salary_deduction">خصم راتب</option>
+                        <option value="cash_demand">مطالبة نقدية</option>
+                      </select>
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="batch-entity">جهة الخصم</label>
+                      <select id="batch-entity" class="membership-input">
+                        <option value="">— بدون (مطالبة نقدية) —</option>
+                      </select>
+                      <span class="membership-hint">إلزامية في دفعات خصم الراتب، وتُترك فارغة في المطالبات النقدية.</span>
+                    </div>
+
+                    <div class="member-field member-field-full">
+                      <label class="membership-label" for="batch-notes">ملاحظات</label>
+                      <textarea id="batch-notes" class="membership-input" rows="2" autocomplete="off"></textarea>
+                    </div>
+                  </div>
+
+                  <!-- 6.1 عناصر الدفعة -->
+                  <div class="member-field member-field-full mt-4">
+                    <p class="membership-label">عناصر الدفعة</p>
+                    <span class="membership-hint" id="batch-items-hint">سطر لكل عضو — المبلغ الأساسي + مبالغ المنتسبين = إجمالي العضو.</span>
+                    <div class="members-table-wrapper" id="batch-items-wrapper">
+                      <table class="members-table" id="batch-items-table">
+                        <thead>
+                          <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">الاسم</th>
+                            <th scope="col">الرقم الوظيفي</th>
+                            <th scope="col">المبلغ الأساسي</th>
+                            <th scope="col">المنتسبون</th>
+                            <th scope="col">الإجمالي</th>
+                          </tr>
+                        </thead>
+                        <tbody id="batch-items-tbody"></tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <p class="member-form-error" id="batch-form-error" hidden></p>
+                </form>
+              </div>
+
+              <div class="membership-modal-footer">
+                <button type="button" class="membership-btn membership-btn-outline" data-close-batch-modal>إغلاق</button>
+                <button type="button" class="membership-btn membership-btn-accent" id="btn-save-batch">حفظ</button>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+
+
+        <section id="tab-reports" class="tab-panel mx-auto hidden max-w-6xl">
+          <div class="empty-state rounded-2xl border-2 border-dashed border-navy-200 bg-white p-12 text-center shadow-lg">
+            <div class="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl border-2 border-dashed border-navy-200 bg-gold-50 text-4xl">📊</div>
+            <h3 class="mt-5 font-display text-xl font-black text-navy-900">التقارير</h3>
+            <p class="mt-2 text-sm font-medium text-navy-500">تقارير الأعضاء، الاشتراكات، والدفعات.</p>
+            <span class="mt-4 inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-3 py-1 text-xs font-extrabold text-gold-800">قيد الإنشاء</span>
+          </div>
+        </section>
+
+      </main>
+
+      <footer class="px-6 pb-6 text-center text-[11px] font-bold text-navy-400">
+        بركة | منصة الجمعيات — وحدة شؤون العضوية
+      </footer>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../../supabase.js"></script>
+  <script src="../../modules.js"></script>
+  <script src="../../ui.js"></script>
+  <script src="../../auth.js"></script>
+  <script src="membership.js?v=20260924"></script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>بركة | منصة الجمعيات — تسجيل الدخول (الخيار ب)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { cairo: ['"Cairo"', 'sans-serif'], tajawal: ['"Tajawal"', 'sans-serif'], display: ['"Tajawal"', '"Cairo"', 'sans-serif'] },
+          colors: {
+            navy: { 50:'#f2f5f9',100:'#e2e8f2',200:'#c9d4e6',300:'#a3b5d2',400:'#7790b8',500:'#58729f',600:'#455b85',700:'#394a6c',800:'#2c3a55',900:'#1d2740',950:'#10182b' },
+            gold: { 50:'#fbf7ea',100:'#f5ebc8',200:'#ead694',300:'#e0c064',400:'#d5ab3d',500:'#c9a227',600:'#a98420',700:'#86661d',800:'#6b511c',900:'#57421b' },
+            ivory: '#faf8f2',
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="style.css?v=20260921b">
+</head>
+<body class="min-h-screen bg-navy-950 font-cairo text-navy-50 antialiased">
+
+  <!-- شاشة التحميل -->
+  <div id="app-loading" class="app-loading" aria-hidden="true">
+    <div class="app-loading-content">
+      <div class="app-loading-logo">ب</div>
+      <div class="app-loading-title">بركة | منصة الجمعيات</div>
+      <div class="app-loading-spinner"></div>
+      <div class="app-loading-text">جارٍ التحميل...</div>
+      <div class="app-loading-hint" id="app-loading-hint"></div>
+    </div>
+  </div>
+  <script>
+    /* ═══ شاشة التحميل: تُخفى عند اكتمال تحميل التطبيق (مع حد أمان) ═══
+       أنماطها في style.css فقط (لا تعتمد على Tailwind) حتى تظهر
+       بشكل سليم ولو تأخر تحميل Tailwind Play CDN أو فشل. */
+    (function () {
+      const el = document.getElementById('app-loading');
+      if (!el) return;
+
+      let hidden = false;
+      const fadeOut = () => {
+        if (hidden) return;
+        hidden = true;
+        el.classList.add('app-loading-hide');
+        setTimeout(() => el.remove(), 500);
+      };
+
+      /* يُستدعى عند اكتمال تهيئة التطبيق — ينتظر اكتمال الموارد (الخطوط) قبل الإخفاء لتفادي وميض الخط */
+      window.hideAppLoading = () => {
+        if (hidden) return;
+        if (document.readyState === 'complete') setTimeout(fadeOut, 180);
+        else window.addEventListener('load', () => setTimeout(fadeOut, 180), { once: true });
+      };
+
+      /* حد أمان: تختفي الشاشة مهما حدث بعد 8 ثوانٍ (شبكة بطيئة جدًا أو فشل CDN) */
+      setTimeout(fadeOut, 8000);
+
+      /* تلميح لطيف يظهر بعد 4 ثوانٍ إن لم يكتمل التحميل */
+      const hint = document.getElementById('app-loading-hint');
+      if (hint) {
+        setTimeout(() => {
+          if (hidden) return;
+          hint.textContent = 'يبدو أن الاتصال بطيء — نواصل التحميل، لحظة من فضلك…';
+          hint.classList.add('app-loading-hint-show');
+        }, 4000);
+      }
+    })();
+  </script>
+
+  <div class="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
+    <!-- ── لوحة الهوية ── -->
+    <aside class="lattice-gold relative hidden flex-col justify-between overflow-hidden bg-navy-950 p-12 text-white lg:flex xl:p-16">
+      <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" aria-hidden="true"></div>
+
+      <div class="relative fade-up">
+        <div class="flex items-center gap-4">
+          <span id="brand-mark" class="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-gold-400 to-gold-600 font-display text-3xl font-black text-navy-950 shadow-lg">ب</span>
+          <div>
+            <p class="text-sm font-bold tracking-wide text-gold-300">بركة | منصة الجمعيات</p>
+            <h1 id="brand-name" class="font-display text-2xl font-black leading-tight">—</h1>
+          </div>
+        </div>
+        <span class="mt-6 inline-flex items-center gap-2 rounded-full border border-gold-700/50 bg-navy-900/70 px-3.5 py-1.5 text-xs font-extrabold text-gold-200">
+          المرحلة الحالية: الهيكل العظمي — مساحة الخزينة
+        </span>
+      </div>
+
+      <div class="relative max-w-md space-y-4">
+        <h2 class="font-display text-4xl font-black leading-[1.25] xl:text-[2.75rem]">
+          خزينة الجمعية،<br><span class="text-gold-300">بضبطٍ وأمانة.</span>
+        </h2>
+        <ul class="space-y-3 pt-4">
+          <li class="flex items-start gap-3.5 rounded-xl border border-gold-700/40 bg-navy-900/60 p-4 backdrop-blur-sm transition-transform duration-300 hover:-translate-y-0.5">
+            <span class="mt-0.5 flex h-10 w-10 items-center justify-center rounded-lg bg-black/20 text-gold-300">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="4"/><path d="M12 10v2l1.5 1.5"/><path d="M3 8h2"/><path d="M3 16h2"/></svg>
+            </span>
+            <div>
+              <p class="font-display text-[15px] font-extrabold">دفتر خزينة منظم</p>
+              <p class="text-[13px] leading-relaxed opacity-70">حركة يومية واضحة بالرصيد الجاري لكل عملية</p>
+            </div>
+          </li>
+          <li class="flex items-start gap-3.5 rounded-xl border border-gold-700/40 bg-navy-900/60 p-4 backdrop-blur-sm transition-transform duration-300 hover:-translate-y-0.5">
+            <span class="mt-0.5 flex h-10 w-10 items-center justify-center rounded-lg bg-black/20 text-gold-300">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M13 16H8"/></svg>
+            </span>
+            <div>
+              <p class="font-display text-[15px] font-extrabold">سندات قبض وصرف</p>
+              <p class="text-[13px] leading-relaxed opacity-70">سندات مرقّمة تلقائيًا قابلة للطباعة والتدقيق</p>
+            </div>
+          </li>
+          <li class="flex items-start gap-3.5 rounded-xl border border-gold-700/40 bg-navy-900/60 p-4 backdrop-blur-sm transition-transform duration-300 hover:-translate-y-0.5">
+            <span class="mt-0.5 flex h-10 w-10 items-center justify-center rounded-lg bg-black/20 text-gold-300">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 14v3"/><path d="M11 10v7"/><path d="M15 12v5"/><path d="M19 7v10"/></svg>
+            </span>
+            <div>
+              <p class="font-display text-[15px] font-extrabold">تقارير للمجلس والمراجع</p>
+              <p class="text-[13px] leading-relaxed opacity-70">مركزية البيانات وسجل كامل للصلاحيات</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <p class="relative text-xs font-medium opacity-50">© 2026 بركة — نظام إدارة خزينة الجمعيات الأهلية</p>
+    </aside>
+
+    <!-- ── نموذج الدخول ── -->
+    <main class="lattice-soft relative flex flex-col items-center justify-center overflow-hidden bg-ivory px-6 py-10 text-navy-900 sm:px-12">
+      <div class="absolute start-5 top-5 flex items-center gap-2 lg:hidden">
+        <span id="brand-mark-sm" class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 font-display text-lg font-black text-navy-950">ب</span>
+        <div class="leading-tight">
+          <p id="brand-name-sm" class="font-display text-sm font-black text-navy-900">—</p>
+          <p class="text-[11px] font-bold text-gold-700">بركة | منصة الجمعيات</p>
+        </div>
+      </div>
+
+      <div class="w-full max-w-md fade-up" style="animation-delay:.08s">
+        <div class="mb-8">
+          <h2 class="font-display text-3xl font-black text-navy-900">تسجيل الدخول</h2>
+          <p class="mt-2 text-[15px] font-medium leading-relaxed text-navy-500">
+            ادخل إلى نظام إدارة خزينة <span id="form-assoc-name" class="font-bold text-gold-700">—</span>
+          </p>
+        </div>
+
+        <form id="loginForm" class="space-y-5" novalidate>
+          <div>
+            <label for="login-id" class="mb-1.5 block text-sm font-extrabold text-navy-800">اسم المستخدم أو البريد الإلكتروني</label>
+            <div class="relative">
+              <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-4 text-navy-400">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </span>
+              <input id="login-id" type="text" autocomplete="username" dir="ltr" placeholder="username / name@baraka.org"
+                class="b-input ps-11 text-start" required>
+            </div>
+          </div>
+
+          <div>
+            <label for="login-password" class="mb-1.5 block text-sm font-extrabold text-navy-800">رمز الدخول</label>
+            <div class="relative">
+              <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-4 text-navy-400">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </span>
+              <input id="login-password" type="password" autocomplete="current-password" dir="ltr" placeholder="••••••••"
+                class="b-input ps-11 pe-12 text-start" required>
+              <button type="button" id="eye-btn" aria-pressed="false" aria-label="إظهار أو إخفاء رمز الدخول"
+                class="absolute inset-y-0 end-0 flex items-center pe-4 text-navy-400 transition-colors hover:text-gold-600">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+<div class="flex items-center justify-between">
+  <label class="flex cursor-pointer select-none items-center gap-2.5 text-sm font-bold">
+    <input type="checkbox" id="remember" checked class="h-5 w-5 rounded border-navy-300 accent-navy-900">
+    <span class="text-navy-800">تذكرني</span>
+  </label>
+  <span class="text-xs font-semibold text-navy-400">كلمة المرور: <span dir="ltr" class="font-bold text-navy-600">Baraka@2026!</span></span>
+</div>
+
+          <p id="login-error" role="alert" class="hidden items-center gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-extrabold text-red-700">اسم المستخدم أو رمز الدخول غير صحيح</p>
+
+          <button type="submit" class="flex w-full items-center justify-center gap-2.5 rounded-md border border-gold-500/40 bg-navy-900 py-4 text-base font-black text-gold-100 shadow-xl shadow-navy-950/30 transition-all duration-300 hover:-translate-y-0.5 hover:bg-navy-800 disabled:opacity-70 disabled:hover:translate-y-0">
+            دخول
+          </button>
+        </form>
+
+        <!-- دخول سريع حسب الدور — تُبنى الأزرار ديناميكيًا في auth.js (renderQuickLogin):
+             كل زر يمثل دورًا ويعرض أول مستخدم نشط فيه — عبر RPC عند تشغيل Supabase،
+             أو من الحسابات المحلية في وضع العرض — وتتحدّث تلقائيًا عند تغيير المستخدمين. -->
+        <div id="quick-login-panel" class="mt-8">
+          <p class="mb-3 flex items-center gap-3 text-xs font-extrabold text-navy-400">
+            <span class="h-px flex-1 border-t border-navy-200"></span>
+            دخول سريع للتجربة — حسب الدور
+            <span class="h-px flex-1 border-t border-navy-200"></span>
+          </p>
+          <div id="quick-login-grid" class="grid grid-cols-2 gap-2" aria-live="polite">
+            <!-- تُحقن الأزرار هنا من auth.js — أول مستخدم نشط لكل دور -->
+            <p class="col-span-2 rounded-xl border border-navy-100 bg-white/60 px-3 py-3 text-center text-[11px] font-bold text-navy-400">جارٍ تحميل حسابات الدخول السريع…</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+  <script src="modules.js"></script>
+  <script src="ui.js"></script>
+  <script src="auth.js"></script>
+  <script src="app.js"></script>
+  <script>
+    /* تعبئة اسم الجمعية والشعار في شاشة الدخول من settings */
+    document.addEventListener('DOMContentLoaded', () => {
+      const s = loadSettings();
+      const names = ['brand-name', 'brand-name-sm', 'form-assoc-name'];
+      names.forEach((id) => { const el = document.getElementById(id); if (el) el.textContent = s.association_name; });
+      if (s.logo_url) {
+        const big = document.getElementById('brand-mark');
+        const small = document.getElementById('brand-mark-sm');
+        if (big) big.outerHTML = `<img src="${s.logo_url}" alt="شعار ${s.association_name}" class="h-16 w-16 rounded-2xl border border-black/10 object-cover shadow-lg">`;
+        if (small) small.outerHTML = `<img src="${s.logo_url}" alt="" class="h-9 w-9 rounded-xl object-cover">`;
+      }
+      initLogin();
+      window.hideAppLoading?.(); /* إخفاء شاشة التحميل بعد اكتمال تهيئة صفحة الدخول */
+    });
+  </script>
+</body>
+</html>

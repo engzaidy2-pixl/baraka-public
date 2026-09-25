@@ -1,0 +1,1826 @@
+/* =====================================================
+   بركة — وحدة شؤون العضوية
+   membership.css
+   الإصدار: 1.0
+   ===================================================== */
+
+/* ═══════════════════════════════════════════════════
+   CSS Variables — للتخصيص السهل (الاستعداد للتسويق)
+   ═══════════════════════════════════════════════════ */
+:root {
+  /* الألوان الأساسية */
+  --primary: #1d2740;
+  --primary-light: #2c3a55;
+  --primary-dark: #10182b;
+  --accent: #c9a227;
+  --accent-light: #d5ab3d;
+  --accent-dark: #a98420;
+  
+  /* الخلفيات */
+  --bg: #faf8f2;
+  --bg-card: #ffffff;
+  --bg-muted: #f2f5f9;
+  
+  /* النصوص */
+  --text-primary: #1d2740;
+  --text-secondary: #58729f;
+  --text-muted: #7790b8;
+  
+  /* الحالات */
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --info: #2563eb;
+  
+  /* الحدود */
+  --border: #e2e8f2;
+  --border-strong: #c9d4e6;
+  
+  /* الظلال */
+  --shadow-sm: 0 1px 3px rgba(29, 39, 64, 0.05);
+  --shadow-md: 0 4px 12px rgba(29, 39, 64, 0.08);
+  --shadow-lg: 0 10px 30px rgba(29, 39, 64, 0.12);
+  
+  /* الأنصاف */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  
+  /* الانتقالات */
+  --transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ═══════════════════════════════════════════════════
+   القائمة الجانبية (Sidebar)
+   ═══════════════════════════════════════════════════ */
+.membership-nav-item {
+  position: relative;
+  transition: var(--transition);
+  border-inline-start: 2px solid transparent;
+}
+
+.membership-nav-item:hover {
+  border-inline-start-color: rgba(201, 162, 39, 0.3);
+}
+
+.membership-nav-item.active {
+  background-color: rgba(255, 255, 255, 0.07);
+  color: var(--accent-light);
+  border-inline-start-color: var(--accent);
+}
+
+.membership-nav-item.active span:first-child {
+  color: var(--accent);
+}
+
+/* حالة "قيد الإنشاء" في القائمة */
+.membership-nav-item.under-construction {
+  opacity: 0.5;
+}
+
+.membership-nav-item.under-construction::after {
+  content: '';
+  position: absolute;
+  inset-inline-end: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.2);
+}
+
+/* ═══════════════════════════════════════════════════
+   التبويبات الرئيسية (Tab Panels)
+   ═══════════════════════════════════════════════════ */
+.tab-panel {
+  animation: panelFadeIn 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes panelFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   الحالات الفارغة (Empty States)
+   ═══════════════════════════════════════════════════ */
+.empty-state {
+  transition: var(--transition);
+}
+
+.empty-state:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-lg);
+}
+
+.empty-state > div:first-child {
+  animation: emptyStatePulse 2s ease-in-out infinite;
+}
+
+@keyframes emptyStatePulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   الجداول (Tables)
+   ═══════════════════════════════════════════════════ */
+.members-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.members-table thead {
+  background-color: var(--primary);
+  color: var(--accent);
+}
+
+.members-table thead th {
+  padding: 0.875rem 1rem;
+  text-align: start;
+  font-weight: 800;
+  font-size: 0.8125rem;
+  letter-spacing: 0.025em;
+}
+
+.members-table thead th:first-child {
+  border-start-start-radius: var(--radius-md);
+}
+
+.members-table thead th:last-child {
+  border-start-end-radius: var(--radius-md);
+}
+
+.members-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: var(--transition);
+}
+
+.members-table tbody tr:hover {
+  background-color: rgba(201, 162, 39, 0.04);
+}
+
+.members-table tbody td {
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.members-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+/* ═══════════════════════════════════════════════════
+   الشارات (Badges / Chips)
+   ═══════════════════════════════════════════════════ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.badge-success {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.badge-warning {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.badge-danger {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.badge-info {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.badge-gold {
+  background-color: var(--accent-light);
+  color: var(--primary);
+}
+
+.badge-muted {
+  background-color: var(--bg-muted);
+  color: var(--text-secondary);
+}
+
+/* ═══════════════════════════════════════════════════
+   البطاقات (Cards)
+   ═══════════════════════════════════════════════════ */
+.membership-card {
+  background-color: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.membership-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.membership-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.membership-card-title {
+  font-size: 1.125rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  font-family: 'Tajawal', sans-serif;
+}
+
+/* ═══════════════════════════════════════════════════
+   النماذج (Forms)
+   ═══════════════════════════════════════════════════ */
+.membership-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-family: inherit;
+  color: var(--text-primary);
+  background-color: var(--bg-card);
+  transition: var(--transition);
+}
+
+.membership-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.15);
+}
+
+.membership-input:disabled {
+  background-color: var(--bg-muted);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.membership-label {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.membership-label .required {
+  color: var(--danger);
+  margin-inline-start: 0.25rem;
+}
+
+.membership-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════════
+   الأزرار (Buttons)
+   ═══════════════════════════════════════════════════ */
+.membership-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.membership-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.membership-btn-primary {
+  background-color: var(--primary);
+  color: var(--accent-light);
+  border: 1px solid rgba(201, 162, 39, 0.4);
+}
+
+.membership-btn-primary:hover:not(:disabled) {
+  background-color: var(--primary-light);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.membership-btn-accent {
+  background-color: var(--accent);
+  color: var(--primary);
+}
+
+.membership-btn-accent:hover:not(:disabled) {
+  background-color: var(--accent-light);
+  transform: translateY(-1px);
+}
+
+.membership-btn-outline {
+  background-color: transparent;
+  color: var(--text-primary);
+  border: 2px solid var(--border-strong);
+}
+
+.membership-btn-outline:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--primary);
+}
+
+.membership-btn-danger {
+  background-color: var(--danger);
+  color: #ffffff;
+}
+
+.membership-btn-danger:hover:not(:disabled) {
+  background-color: #b91c1c;
+}
+
+.membership-btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.membership-btn-lg {
+  padding: 0.875rem 1.75rem;
+  font-size: 1rem;
+}
+
+/* ═══════════════════════════════════════════════════
+   النوافذ المنبثقة (Modals)
+   ═══════════════════════════════════════════════════ */
+.membership-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: rgba(16, 24, 43, 0.6);
+  backdrop-filter: blur(4px);
+  animation: modalBackdropIn 0.2s ease;
+}
+
+@keyframes modalBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.membership-modal {
+  width: 100%;
+  max-width: 32rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  background-color: var(--bg-card);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  animation: modalIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.membership-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.membership-modal-title {
+  font-size: 1.125rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  font-family: 'Tajawal', sans-serif;
+}
+
+.membership-modal-body {
+  padding: 1.5rem;
+}
+
+.membership-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ═══════════════════════════════════════════════════
+   التنبيهات (Toasts)
+   ═══════════════════════════════════════════════════ */
+.membership-toast-host {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  pointer-events: none;
+}
+
+.membership-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 800;
+  box-shadow: var(--shadow-lg);
+  animation: toastIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: auto;
+  max-width: 90vw;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.membership-toast-success {
+  background-color: var(--primary);
+  color: var(--accent-light);
+  border: 1px solid rgba(201, 162, 39, 0.4);
+}
+
+.membership-toast-error {
+  background-color: #7f1d1d;
+  color: #fee2e2;
+  border: 1px solid #dc2626;
+}
+
+.membership-toast-info {
+  background-color: var(--accent);
+  color: var(--primary);
+}
+
+/* ═══════════════════════════════════════════════════
+   البطاقات الإحصائية (Stat Cards)
+   ═══════════════════════════════════════════════════ */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-card {
+  background-color: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  transition: var(--transition);
+}
+
+.stat-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.stat-card-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-card-value {
+  margin-top: 0.5rem;
+  font-size: 1.875rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  font-family: 'Tajawal', sans-serif;
+}
+
+.stat-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-md);
+  background-color: var(--bg-muted);
+  color: var(--accent);
+  font-size: 1.25rem;
+}
+
+/* ═══════════════════════════════════════════════════
+   لوحة التحكم (Dashboard)
+   ═══════════════════════════════════════════════════ */
+
+/* ── 1. بانر الترحيب ── */
+.welcome-banner {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(201, 162, 39, 0.3);
+}
+
+/* زخرفة ذهبية متوهجة في زاوية البانر */
+.welcome-banner::before {
+  content: '';
+  position: absolute;
+  top: -4rem;
+  inset-inline-end: -4rem;
+  width: 14rem;
+  height: 14rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201, 162, 39, 0.22) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* معينات ذهبية صغيرة أسفل البانر (نفس زخرفة عناوين القائمة الجانبية) */
+.welcome-banner::after {
+  content: '';
+  position: absolute;
+  bottom: -0.375rem;
+  inset-inline-end: 12rem;
+  width: 0.75rem;
+  height: 0.75rem;
+  transform: rotate(45deg);
+  background-color: var(--accent);
+  box-shadow:
+    -1.5rem 0 0 rgba(201, 162, 39, 0.55),
+    -3rem 0 0 rgba(201, 162, 39, 0.28);
+  pointer-events: none;
+}
+
+/* ── 3. شبكة الإجراءات السريعة ── */
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+/* ── 3. زر الإجراء السريع ── */
+.quick-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 1.25rem 1rem;
+  background-color: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-family: inherit;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: center;
+  transition: var(--transition);
+}
+
+.quick-action:hover {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, #ffffff 0%, rgba(201, 162, 39, 0.07) 100%);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.quick-action:active {
+  transform: translateY(-1px);
+}
+
+.quick-action:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.25);
+}
+
+.quick-action-sub {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* ── 4. قسم التنبيهات ── */
+.alerts-section {
+  background-color: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.alerts-section:hover {
+  border-color: rgba(201, 162, 39, 0.45);
+  box-shadow: var(--shadow-md);
+}
+
+.alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.6;
+  border-inline-start: 4px solid transparent;
+  animation: panelFadeIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.alert-item + .alert-item {
+  margin-top: 0.625rem;
+}
+
+.alert-item-icon {
+  flex-shrink: 0;
+  font-size: 1.125rem;
+  line-height: 1.6;
+}
+
+.alert-item-warning {
+  background-color: #fef3c7;
+  border-inline-start-color: var(--warning);
+  color: #92400e;
+}
+
+.alert-item-danger {
+  background-color: #fee2e2;
+  border-inline-start-color: var(--danger);
+  color: #991b1b;
+}
+
+.alert-item-info {
+  background-color: #dbeafe;
+  border-inline-start-color: var(--info);
+  color: #1e40af;
+}
+
+.alert-item-ok {
+  background-color: #d1fae5;
+  border-inline-start-color: var(--success);
+  color: #065f46;
+}
+
+/* ── 5. آخر الأنشطة ── */
+.recent-activity {
+  background-color: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.recent-activity:hover {
+  border-color: rgba(201, 162, 39, 0.45);
+  box-shadow: var(--shadow-md);
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.75rem 0.25rem;
+  animation: panelFadeIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.activity-item + .activity-item {
+  border-top: 1px solid var(--border);
+}
+
+.activity-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-md);
+  background-color: rgba(201, 162, 39, 0.12);
+  border: 1px solid rgba(201, 162, 39, 0.25);
+  font-size: 1.125rem;
+}
+
+.activity-time {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── حالة فارغة + هيكل تحميل ── */
+.dashboard-empty {
+  padding: 1.75rem 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.dashboard-skeleton {
+  height: 2.75rem;
+  margin-bottom: 0.625rem;
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, var(--bg-muted) 25%, #e9edf5 50%, var(--bg-muted) 75%);
+  background-size: 200% 100%;
+  animation: dashboardShimmer 1.4s ease infinite;
+}
+
+.dashboard-skeleton:last-child {
+  margin-bottom: 0;
+}
+
+@keyframes dashboardShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ═══════════════════════════════════════════════════
+   شريط البحث والفلترة (Toolbar)
+   ═══════════════════════════════════════════════════ */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 1rem;
+  background-color: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 1.5rem;
+}
+
+.toolbar-search {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+
+.toolbar-search input {
+  width: 100%;
+  padding: 0.625rem 2.5rem 0.625rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: var(--transition);
+}
+
+.toolbar-search input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.toolbar-search .search-icon {
+  position: absolute;
+  inset-inline-start: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ═══════════════════════════════════════════════════
+   الترقيم (Pagination)
+   ═══════════════════════════════════════════════════ */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 1rem 0;
+}
+
+.pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.pagination-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--primary);
+}
+
+.pagination-btn.active {
+  background-color: var(--primary);
+  color: var(--accent-light);
+  border-color: var(--primary);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════
+   شجرة العضوية (Tree View)
+   ═══════════════════════════════════════════════════ */
+.member-tree {
+  padding-inline-start: 1.5rem;
+  border-inline-start: 2px dashed var(--border);
+  margin-top: 0.5rem;
+}
+
+.member-tree-item {
+  position: relative;
+  padding: 0.5rem 0;
+}
+
+.member-tree-item::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: -1.5rem;
+  top: 1rem;
+  width: 1rem;
+  height: 2px;
+  background-color: var(--border);
+}
+
+.member-tree-relationship {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  background-color: var(--bg-muted);
+  color: var(--text-secondary);
+  margin-inline-start: 0.5rem;
+}
+
+/* ═══════════════════════════════════════════════════
+   الاستيراد (Import Dropzone)
+   ═══════════════════════════════════════════════════ */
+.import-dropzone {
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition);
+  background-color: var(--bg-card);
+}
+
+.import-dropzone:hover,
+.import-dropzone.dragover {
+  border-color: var(--accent);
+  background-color: rgba(201, 162, 39, 0.05);
+}
+
+.import-dropzone-icon {
+  font-size: 3rem;
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+
+.import-dropzone-text {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.import-dropzone-hint {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════════
+   تبويب الأعضاء (tab-members)
+   ═══════════════════════════════════════════════════ */
+
+/* ── 1. شريط الأدوات (.members-toolbar) ── */
+.members-toolbar {
+  background-color: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.members-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ── البحث الفوري ── */
+.members-search {
+  position: relative;
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+
+.members-search-icon {
+  position: absolute;
+  inset-inline-start: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.875rem;
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.members-search-input {
+  width: 100%;
+  padding: 0.6875rem 2.75rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--text-primary);
+  background-color: var(--bg-card);
+  transition: var(--transition);
+}
+
+.members-search-input::-webkit-search-cancel-button,
+.members-search-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.members-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.15);
+}
+
+.members-search-clear {
+  position: absolute;
+  inset-inline-end: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: 50%;
+  background-color: var(--bg-muted);
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.members-search-clear:hover {
+  background-color: var(--danger);
+  color: #ffffff;
+}
+
+.members-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ── الفلاتر ── */
+.members-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.875rem;
+  padding-top: 0.875rem;
+  border-top: 1px dashed var(--border);
+}
+
+.members-filter {
+  min-width: 0;
+}
+
+.members-filter .membership-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.members-filter .membership-input {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.members-filter-reset {
+  display: flex;
+  align-items: flex-end;
+}
+
+.members-filter-reset .membership-btn {
+  width: 100%;
+}
+
+/* ── 2. ملخص النتائج ── */
+.members-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-inline: 0.25rem;
+}
+
+.members-count {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+
+.members-count b {
+  color: var(--primary);
+}
+
+.members-active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.members-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background-color: rgba(201, 162, 39, 0.14);
+  color: var(--primary);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════
+   جدول الأعضاء (.members-table-wrapper / .members-table)
+   ═══════════════════════════════════════════════════ */
+.members-table-wrapper {
+  background-color: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+  box-shadow: var(--shadow-sm);
+  -webkit-overflow-scrolling: touch;
+}
+
+.members-table-wrapper .members-table {
+  min-width: 900px;
+}
+
+.members-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  white-space: nowrap;
+  background-color: var(--primary);
+}
+
+.members-table .members-th-actions {
+  text-align: center;
+}
+
+.members-table tbody tr {
+  border-bottom: 1px solid var(--border);
+}
+
+.members-table tbody tr:nth-child(even) {
+  background-color: rgba(242, 245, 249, 0.55);
+}
+
+.members-table tbody tr:hover {
+  background-color: rgba(201, 162, 39, 0.07);
+}
+
+.members-table tbody td {
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+}
+
+.members-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.member-number {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-muted);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.member-name {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.member-sub {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.member-phone {
+  direction: ltr;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.member-type {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(201, 162, 39, 0.35);
+  background-color: rgba(201, 162, 39, 0.1);
+  color: var(--primary);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.member-muted {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+/* صفوف هيكلية أثناء التحميل */
+.members-skeleton {
+  height: 0.75rem;
+  border-radius: 9999px;
+  background-image: linear-gradient(90deg, var(--bg-muted) 25%, #e8edf5 50%, var(--bg-muted) 75%);
+  background-size: 200% 100%;
+  animation: membersShimmer 1.4s linear infinite;
+}
+
+@keyframes membersShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ═══════════════════════════════════════════════════
+   شارات الحالة (.member-badge)
+   ═══════════════════════════════════════════════════ */
+.member-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.member-badge::before {
+  content: '';
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.member-badge-active {
+  background-color: #d1fae5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+.member-badge-suspended {
+  background-color: #fef3c7;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.member-badge-hidden {
+  background-color: var(--bg-muted);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+.member-badge-service {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background-color: var(--bg-muted);
+  color: var(--text-secondary);
+  font-size: 0.625rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════
+   أزرار الإجراءات (.member-actions)
+   ═══════════════════════════════════════════════════ */
+.member-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.member-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.member-action:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.member-action[data-member-action="view"]:hover {
+  border-color: var(--info);
+  color: var(--info);
+}
+
+.member-action[data-member-action="edit"]:hover {
+  border-color: var(--accent);
+  color: var(--accent-dark);
+}
+
+.member-action[data-member-action="delete"]:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ═══════════════════════════════════════════════════
+   الحالة الفارغة (.members-empty)
+   ═══════════════════════════════════════════════════ */
+.members-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 3rem 1.5rem;
+  background-color: var(--bg-card);
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.members-empty-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.members-empty-title {
+  font-family: 'Tajawal', sans-serif;
+  font-size: 1.125rem;
+  font-weight: 900;
+  color: var(--text-primary);
+}
+
+.members-empty-text {
+  max-width: 32rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════════
+   الترقيم (.pagination) — نسخة تبويب الأعضاء
+   ═══════════════════════════════════════════════════ */
+#members-pagination.pagination {
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 1.25rem 0 0.25rem;
+}
+
+.pagination-info {
+  margin-inline-end: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+
+.pagination-gap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  color: var(--text-muted);
+  font-weight: 800;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════
+   نموذج العضو (.member-form)
+   ═══════════════════════════════════════════════════ */
+.member-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.875rem;
+}
+
+.member-field {
+  min-width: 0;
+}
+
+.member-field-full {
+  grid-column: 1 / -1;
+}
+
+.member-form-error {
+  margin-top: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md);
+  background-color: #fef2f2;
+  color: #991b1b;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════
+   التصميم المتجاوب (Responsive)
+   ═══════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .toolbar-search {
+    min-width: 100%;
+  }
+  
+  .toolbar-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+  
+  .toolbar-actions .membership-btn {
+    flex: 1;
+  }
+  
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .membership-modal {
+    max-width: 100%;
+    max-height: 95vh;
+  }
+  
+  .membership-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .membership-table-wrapper table {
+    min-width: 640px;
+  }
+  
+  .pagination-btn {
+    min-width: 2rem;
+    height: 2rem;
+    font-size: 0.8125rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .membership-card {
+    padding: 1rem;
+  }
+  
+  .stat-card-value {
+    font-size: 1.5rem;
+  }
+}
+/* ═══════════════════════════════════════════════════
+   تبويب الأعضاء — تحويل الجدول إلى بطاقات على الهاتف
+   ═══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .members-table-wrapper {
+    padding: 0;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .members-table-wrapper .members-table {
+    min-width: 0;
+  }
+
+  .members-table thead {
+    display: none;
+  }
+
+  .members-table,
+  .members-table tbody,
+  .members-table tbody tr,
+  .members-table tbody td {
+    display: block;
+    width: 100%;
+  }
+
+  .members-table tbody tr {
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 0.875rem;
+    background-color: var(--bg-card);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .members-table tbody tr:nth-child(even) {
+    background-color: var(--bg-card);
+  }
+
+  .members-table tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.45rem 0;
+    text-align: end;
+    border-bottom: 1px dashed var(--border);
+  }
+
+  .members-table tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-size: 0.6875rem;
+    font-weight: 800;
+    color: var(--text-secondary);
+  }
+
+  .members-table tbody td:last-child {
+    padding-top: 0.625rem;
+    border-bottom: none;
+  }
+
+  .member-phone {
+    text-align: start;
+  }
+
+  .member-actions {
+    justify-content: flex-start;
+  }
+
+  .member-action {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .member-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .members-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .members-toolbar-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .members-search {
+    min-width: 100%;
+  }
+
+  .members-toolbar-actions .membership-btn {
+    flex: 1;
+  }
+
+  .members-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .members-filter-reset {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 420px) {
+  .members-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .members-toolbar-actions {
+    flex-direction: column;
+  }
+}
+/* ═══════════════════════════════════════════════════
+   تبويبا جهات العمل وجهات الخصم
+   (tab-employers / tab-deduction-entities)
+   يعيدان استخدام أنماط .members-toolbar و .members-table
+   و .members-empty و .member-form كما هي دون تكرار —
+   إضافات جديدة فقط لألوان تمرير أزرار الإجراءات
+   (سمات data-employer-action / data-entity-action)
+   ═══════════════════════════════════════════════════ */
+.member-action[data-employer-action="edit"]:hover,
+.member-action[data-entity-action="edit"]:hover {
+  border-color: var(--accent);
+  color: var(--accent-dark);
+}
+
+.member-action[data-employer-action="delete"]:hover,
+.member-action[data-entity-action="delete"]:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ═══════════════════════════════════════════════════
+   ملخص الاشتراكات + شارات جدول الاشتراكات
+   (tab-subscriptions — .subs-summary / .subs-badge-*)
+   ═══════════════════════════════════════════════════ */
+
+/* ── 1. شبكة الملخص العلوي ── */
+.subs-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0 1.5rem;
+}
+
+.subs-summary-card {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.125rem 1.25rem 1.25rem;
+  transition: var(--transition);
+}
+
+.subs-summary-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-light), var(--accent));
+  opacity: 0.9;
+}
+
+.subs-summary-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.subs-summary-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.subs-summary-value {
+  margin-top: 0.5rem;
+  font-family: 'Tajawal', sans-serif;
+  font-size: 1.75rem;
+  line-height: 1.2;
+  font-weight: 900;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.subs-summary-success {
+  border-color: rgba(5, 150, 105, 0.35);
+  background-color: rgba(5, 150, 105, 0.05);
+}
+
+.subs-summary-success::before {
+  background: linear-gradient(90deg, #34d399, var(--success));
+}
+
+.subs-summary-success .subs-summary-value {
+  color: var(--success);
+}
+
+.subs-summary-success:hover {
+  border-color: var(--success);
+}
+
+.subs-summary-danger {
+  border-color: rgba(220, 38, 38, 0.3);
+  background-color: rgba(220, 38, 38, 0.04);
+}
+
+.subs-summary-danger::before {
+  background: linear-gradient(90deg, #f87171, var(--danger));
+}
+
+.subs-summary-danger .subs-summary-value {
+  color: var(--danger);
+}
+
+.subs-summary-danger:hover {
+  border-color: var(--danger);
+}
+
+.subs-badge-unpaid,
+.subs-badge-partial,
+.subs-badge-paid {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.subs-badge-unpaid::before,
+.subs-badge-partial::before,
+.subs-badge-paid::before {
+  content: '';
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.subs-badge-unpaid {
+  background-color: #fee2e2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.subs-badge-partial {
+  background-color: #fef3c7;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.subs-badge-paid {
+  background-color: #d1fae5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+.subs-method-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background-color: var(--bg-muted);
+  color: var(--text-secondary);
+  font-size: 0.625rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.subs-method-badge[data-method='cash'] {
+  background-color: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+.subs-method-badge[data-method='salary_deduction'] {
+  background-color: #f5ebc8;
+  border-color: #ead694;
+  color: var(--accent-dark);
+}
+
+.subs-method-badge[data-method='bank_transfer'] {
+  background-color: #dbeafe;
+  border-color: #bfdbfe;
+  color: #1e40af;
+}
+
+@media (max-width: 640px) {
+  .subs-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .subs-summary-value {
+    font-size: 1.375rem;
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════
+   تقليل الحركة (Accessibility)
+   ═══════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
