@@ -4772,10 +4772,15 @@
     const resetBtn = document.getElementById('btn-reset-subs-filters');
     if (resetBtn) resetBtn.addEventListener('click', resetSubsFilters);
 
-    const bulkBtn = document.getElementById('btn-bulk-batch');
-    if (bulkBtn && !bulkBtn.dataset.bulkBatchOpenBound) {
-      bulkBtn.dataset.bulkBatchOpenBound = '1';
-      bulkBtn.addEventListener('click', openBulkBatchModal);
+    const bulkSubBtn = document.getElementById('btn-bulk-sub');
+    if (bulkSubBtn && !bulkSubBtn.dataset.bulkSubOpenBound) {
+      bulkSubBtn.dataset.bulkSubOpenBound = '1';
+      bulkSubBtn.addEventListener('click', () => {
+        // نافذة الإجراء التجميعي داخل تبويب الدفعات — يجب إظهاره أولًا
+        // وإلا بقيت النافذة مخفية (الأب يحمل hidden).
+        if (typeof showTab === 'function') showTab('deductions');
+        openBulkBatchModal();
+      });
     }
 
     const exportBtn = document.getElementById('btn-export-subs');
