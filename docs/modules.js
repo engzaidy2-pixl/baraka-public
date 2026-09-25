@@ -123,6 +123,89 @@ const DEFAULT_USERS = [
 ];
 const DEMO_PASSWORD = '123456';
 
+/* ── العملات الرسمية — الجنيه المصري أولًا ── */
+const CURRENCIES = [
+  { code: 'EGP', name_ar: 'جنيه مصري', name_en: 'Egyptian Pound', symbol: 'ج.م', symbol_en: 'E£', flag: '🇪🇬', decimals: 2, country: 'EG' },
+  { code: 'SAR', name_ar: 'ريال سعودي', name_en: 'Saudi Riyal', symbol: 'ر.س', symbol_en: 'SAR', flag: '🇸🇦', decimals: 2, country: 'SA' },
+  { code: 'USD', name_ar: 'دولار أمريكي', name_en: 'US Dollar', symbol: '$', symbol_en: '$', flag: '🇺🇸', decimals: 2, country: 'US' },
+  { code: 'EUR', name_ar: 'يورو', name_en: 'Euro', symbol: '€', symbol_en: '€', flag: '🇪🇺', decimals: 2, country: 'EU' },
+  { code: 'AED', name_ar: 'درهم إماراتي', name_en: 'UAE Dirham', symbol: 'د.إ', symbol_en: 'AED', flag: '🇦🇪', decimals: 2, country: 'AE' },
+  { code: 'KWD', name_ar: 'دينار كويتي', name_en: 'Kuwaiti Dinar', symbol: 'د.ك', symbol_en: 'KWD', flag: '🇰🇼', decimals: 3, country: 'KW' },
+  { code: 'QAR', name_ar: 'ريال قطري', name_en: 'Qatari Riyal', symbol: 'ر.ق', symbol_en: 'QAR', flag: '🇶🇦', decimals: 2, country: 'QA' },
+  { code: 'BHD', name_ar: 'دينار بحريني', name_en: 'Bahraini Dinar', symbol: 'د.ب', symbol_en: 'BHD', flag: '🇧🇭', decimals: 3, country: 'BH' },
+  { code: 'OMR', name_ar: 'ريال عماني', name_en: 'Omani Rial', symbol: 'ر.ع', symbol_en: 'OMR', flag: '🇴🇲', decimals: 3, country: 'OM' },
+  { code: 'JOD', name_ar: 'دينار أردني', name_en: 'Jordanian Dinar', symbol: 'د.أ', symbol_en: 'JOD', flag: '🇯🇴', decimals: 3, country: 'JO' },
+  { code: 'GBP', name_ar: 'جنيه إسترليني', name_en: 'British Pound', symbol: '£', symbol_en: '£', flag: '🇬🇧', decimals: 2, country: 'GB' },
+  { code: 'TRY', name_ar: 'ليرة تركية', name_en: 'Turkish Lira', symbol: '₺', symbol_en: '₺', flag: '🇹🇷', decimals: 2, country: 'TR' },
+];
+
+const LEGACY_CURRENCY_MAP = {
+  'ريال سعودي': 'SAR',
+  'ريال': 'SAR',
+  'ر.س': 'SAR',
+  'SAR': 'SAR',
+  'جنيه مصري': 'EGP',
+  'جنيه': 'EGP',
+  'ج.م': 'EGP',
+  'EGP': 'EGP',
+  'دولار أمريكي': 'USD',
+  'دولار': 'USD',
+  'USD': 'USD',
+  '$': 'USD',
+  'يورو': 'EUR',
+  'EUR': 'EUR',
+  '€': 'EUR',
+  'درهم إماراتي': 'AED',
+  'درهم': 'AED',
+  'AED': 'AED',
+  'دينار كويتي': 'KWD',
+  'KWD': 'KWD',
+  'ريال قطري': 'QAR',
+  'QAR': 'QAR',
+  'دينار بحريني': 'BHD',
+  'BHD': 'BHD',
+  'ريال عماني': 'OMR',
+  'OMR': 'OMR',
+  'دينار أردني': 'JOD',
+  'JOD': 'JOD',
+  'جنيه إسترليني': 'GBP',
+  'GBP': 'GBP',
+  'ليرة تركية': 'TRY',
+  'TRY': 'TRY',
+};
+
+function normalizeCurrencyCode(input) {
+  if (!input) return 'EGP';
+  const trimmed = String(input).trim();
+  if (LEGACY_CURRENCY_MAP[trimmed]) return LEGACY_CURRENCY_MAP[trimmed];
+  const upper = trimmed.toUpperCase();
+  if (CURRENCIES.some(c => c.code === upper)) return upper;
+  // Try to find by Arabic name
+  const found = CURRENCIES.find(c => c.name_ar === trimmed || c.symbol === trimmed);
+  if (found) return found.code;
+  return 'EGP';
+}
+
+function getCurrency(code) {
+  const normalized = normalizeCurrencyCode(code);
+  return CURRENCIES.find(c => c.code === normalized) || CURRENCIES[0];
+}
+
+function getCurrencySymbol(code, lang = 'ar') {
+  const cur = getCurrency(code);
+  return lang === 'ar' ? cur.symbol : cur.symbol_en;
+}
+
+function formatMoneyWithCurrency(amount, currencyCode, locale = 'ar-EG') {
+  const cur = getCurrency(currencyCode);
+  const num = Number(amount) || 0;
+  const formatted = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: cur.decimals === 3 ? 3 : 0,
+    maximumFractionDigits: cur.decimals,
+  }).format(num);
+  return `${formatted} ${cur.symbol}`;
+}
+
 /* ── الإعدادات الافتراضية (جدول settings — صف واحد) ── */
 const DEFAULT_SETTINGS = {
   association_name: 'جمعية البركة الأهلية',
@@ -130,7 +213,7 @@ const DEFAULT_SETTINGS = {
   address: 'الرياض — حي العليا، شارع الملك فهد',
   phone: '+966 50 123 4567',
   email: 'info@baraka.org',
-  currency: 'ريال سعودي',
+  currency: 'EGP',
   fiscal_year: '2026',
   allow_email_login: true,
   username_case_sensitive: false,
@@ -195,11 +278,25 @@ function loadMatrix() {
 }
 
 function loadUsers()    { return B_STORE.get('baraka_b.users', DEFAULT_USERS); }
-function loadSettings() { return B_STORE.get('baraka_b.settings', DEFAULT_SETTINGS); }
+function loadSettings() {
+  const raw = B_STORE.get('baraka_b.settings', DEFAULT_SETTINGS);
+  // ترحيل العملة القديمة إلى كود ISO
+  if (raw && raw.currency) {
+    raw.currency = normalizeCurrencyCode(raw.currency);
+  } else if (raw) {
+    raw.currency = 'EGP';
+  }
+  return raw;
+}
 
 function saveUsers(list)       { B_STORE.set('baraka_b.users', list); }
 function saveMatrix(m)         { B_STORE.set('baraka_b.matrix', m); }
-function saveSettings(s)       { B_STORE.set('baraka_b.settings', s); }
+function saveSettings(s) {
+  if (s && s.currency) {
+    s.currency = normalizeCurrencyCode(s.currency);
+  }
+  B_STORE.set('baraka_b.settings', s);
+}
 
 /* ══════════════════════════════════════════════════════════════
  * طبقة المزامنة مع Supabase (المراحل 1-3)
@@ -223,6 +320,7 @@ async function fetchSettings() {
     const s = {
       ...DEFAULT_SETTINGS,
       ...data,
+      currency: normalizeCurrencyCode(data.currency || DEFAULT_SETTINGS.currency),
       logo_url: data.logo_url || '',
       fiscal_year: data.fiscal_year != null ? String(data.fiscal_year) : DEFAULT_SETTINGS.fiscal_year,
       updated_at: data.updated_at || '',
@@ -247,7 +345,7 @@ async function pushSettings(s) {
       address: s.address || '',
       phone: s.phone || '',
       email: s.email || '',
-      currency: s.currency || 'ريال سعودي',
+      currency: normalizeCurrencyCode(s.currency || 'EGP'),
       fiscal_year: parseInt(s.fiscal_year, 10) || null,
       allow_email_login: !!s.allow_email_login,
       username_case_sensitive: !!s.username_case_sensitive,
@@ -416,6 +514,13 @@ if (typeof module !== 'undefined' && module.exports) {
     MODULE_GROUPS,
     MODULE_TABS,
     TOPBAR_ICONS,
+    CURRENCIES,
+    LEGACY_CURRENCY_MAP,
+    normalizeCurrencyCode,
+    getCurrency,
+    getCurrencySymbol,
+    formatMoneyWithCurrency,
+    DEFAULT_SETTINGS,
     defaultMatrix,
     loadMatrix,
     saveMatrix,

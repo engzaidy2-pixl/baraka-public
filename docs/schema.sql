@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS settings (
   address TEXT DEFAULT '',
   phone TEXT DEFAULT '',
   email TEXT DEFAULT '',
-  currency TEXT DEFAULT 'ريال سعودي',
+  currency TEXT DEFAULT 'EGP',
   fiscal_year INTEGER DEFAULT 2026,
   allow_email_login BOOLEAN DEFAULT false,
   username_case_sensitive BOOLEAN DEFAULT false,

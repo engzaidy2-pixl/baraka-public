@@ -454,13 +454,45 @@
     return new Intl.NumberFormat('ar-SA').format(Number(n) || 0);
   }
 
-  /** تنسيق المبالغ بالريال */
+  /** تنسيق المبالغ بالعملة المختارة من الإعدادات */
+  function getCurrentCurrencyCode() {
+    try {
+      const s = (typeof STATE !== 'undefined' && STATE.settings) ? STATE.settings : (typeof loadSettings === 'function' ? loadSettings() : null);
+      const code = s ? s.currency : 'EGP';
+      if (typeof normalizeCurrencyCode === 'function') return normalizeCurrencyCode(code);
+      return code || 'EGP';
+    } catch (e) {
+      return 'EGP';
+    }
+  }
+
+  function getCurrentCurrency() {
+    try {
+      const code = getCurrentCurrencyCode();
+      if (typeof getCurrency === 'function') return getCurrency(code);
+      if (typeof CURRENCIES !== 'undefined') return CURRENCIES.find(c => c.code === code) || CURRENCIES[0];
+      return { code: 'EGP', symbol: 'ج.م', name_ar: 'جنيه مصري', decimals: 2, flag: '🇪🇬' };
+    } catch (e) {
+      return { code: 'EGP', symbol: 'ج.م', name_ar: 'جنيه مصري', decimals: 2, flag: '🇪🇬' };
+    }
+  }
+
   function fmtMoney(n) {
-    const formatted = new Intl.NumberFormat('ar-SA', {
+    const cur = getCurrentCurrency();
+    const formatted = new Intl.NumberFormat('ar-EG', {
       minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: cur.decimals || 2,
     }).format(Number(n) || 0);
-    return `${formatted} ر.س`;
+    return `${formatted} ${cur.symbol}`;
+  }
+
+  function fmtMoneyWithCode(n, code) {
+    try {
+      if (typeof formatMoneyWithCurrency === 'function') {
+        return formatMoneyWithCurrency(n, code || getCurrentCurrencyCode());
+      }
+    } catch (e) {}
+    return fmtMoney(n);
   }
 
   /** الزمن النسبي بالعربية */

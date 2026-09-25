@@ -291,7 +291,19 @@ function refreshBrand() {
   const sideName = document.getElementById('sidebar-assoc-name');
   if (sideName) sideName.textContent = s.association_name;
   const cur = document.getElementById('dash-currency');
-  if (cur) cur.textContent = s.currency;
+  if (cur) {
+    try {
+      const curObj = (typeof getCurrency !== 'undefined') ? getCurrency(s.currency) : null;
+      if (curObj) {
+        cur.textContent = `${curObj.flag} ${curObj.name_ar} (${curObj.code}) • ${curObj.symbol}`;
+        cur.title = `${curObj.name_en} - ${curObj.symbol_en}`;
+      } else {
+        cur.textContent = s.currency;
+      }
+    } catch (e) {
+      cur.textContent = s.currency;
+    }
+  }
 }
 
 function initTopbar() {
@@ -340,7 +352,11 @@ function renderSettingsForm(container) {
         <h3 class="mb-6 font-display text-lg font-black text-navy-900">بيانات الجمعية</h3>
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <div><label for="s-name" class="mb-1.5 block text-sm font-extrabold text-navy-800">اسم الجمعية</label><input id="s-name" type="text" class="b-input" value="${s.association_name}"></div>
-          <div><label for="s-currency" class="mb-1.5 block text-sm font-extrabold text-navy-800">العملة</label><input id="s-currency" type="text" class="b-input" value="${s.currency}"></div>
+          <div>
+            <label class="mb-1.5 block text-sm font-extrabold text-navy-800">العملة الرسمية</label>
+            <div id="s-currency-wrapper" class="relative"></div>
+            <p class="mt-1.5 text-[11px] font-bold text-navy-400">يُطبَّق على جميع المبالغ في النظام — الجنيه المصري أولًا</p>
+          </div>
           <div class="sm:col-span-2"><label for="s-address" class="mb-1.5 block text-sm font-extrabold text-navy-800">العنوان</label><input id="s-address" type="text" class="b-input" value="${s.address}"></div>
           <div><label for="s-phone" class="mb-1.5 block text-sm font-extrabold text-navy-800">الهاتف</label><input id="s-phone" type="tel" dir="ltr" class="b-input text-start" value="${s.phone}"></div>
           <div><label for="s-email" class="mb-1.5 block text-sm font-extrabold text-navy-800">البريد الإلكتروني</label><input id="s-email" type="email" dir="ltr" class="b-input text-start" value="${s.email}"></div>
@@ -373,12 +389,13 @@ function renderSettingsForm(container) {
   `;
 
   renderLogoPreview();
+  renderCurrencySelector();
 
-  ['s-name', 's-currency', 's-address', 's-phone', 's-email', 's-fiscal'].forEach((id) => {
+  ['s-name', 's-address', 's-phone', 's-email', 's-fiscal'].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('input', (e) => {
-      const map = { 's-name': 'association_name', 's-currency': 'currency', 's-address': 'address', 's-phone': 'phone', 's-email': 'email', 's-fiscal': 'fiscal_year' };
+      const map = { 's-name': 'association_name', 's-address': 'address', 's-phone': 'phone', 's-email': 'email', 's-fiscal': 'fiscal_year' };
       settingsDraft[map[id]] = e.target.value;
     });
   });
@@ -409,6 +426,141 @@ function renderSettingsForm(container) {
     renderSavedAt();
     toast('تم حفظ الإعدادات والصيانة');
   });
+}
+
+function renderCurrencySelector() {
+  const wrapper = document.getElementById('s-currency-wrapper');
+  if (!wrapper) return;
+  const currencies = (typeof CURRENCIES !== 'undefined' && CURRENCIES.length) ? CURRENCIES : [
+    { code: 'EGP', name_ar: 'جنيه مصري', name_en: 'Egyptian Pound', symbol: 'ج.م', flag: '🇪🇬' },
+    { code: 'SAR', name_ar: 'ريال سعودي', name_en: 'Saudi Riyal', symbol: 'ر.س', flag: '🇸🇦' },
+  ];
+  const currentCode = (typeof normalizeCurrencyCode !== 'undefined')
+    ? normalizeCurrencyCode(settingsDraft.currency || 'EGP')
+    : (settingsDraft.currency || 'EGP');
+  const current = (typeof getCurrency !== 'undefined')
+    ? getCurrency(currentCode)
+    : currencies.find(c => c.code === currentCode) || currencies[0];
+
+  wrapper.innerHTML = `
+    <div class="relative">
+      <button type="button" id="s-currency-btn" class="b-input flex w-full items-center justify-between gap-3 !py-2.5 text-start">
+        <span class="flex items-center gap-2.5">
+          <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-gold-50 text-lg">${current.flag}</span>
+          <span class="flex flex-col leading-tight">
+            <span class="text-sm font-black text-navy-900">${current.name_ar} <span class="text-[11px] font-bold text-navy-400">(${current.code})</span></span>
+            <span class="text-[11px] font-bold text-navy-500">${current.symbol} • ${current.name_en}</span>
+          </span>
+        </span>
+        <span class="text-navy-400">▼</span>
+      </button>
+      <div id="s-currency-dropdown" class="absolute z-20 mt-2 hidden max-h-80 w-full overflow-hidden rounded-xl border-2 border-navy-100 bg-white shadow-2xl">
+        <div class="border-b border-navy-100 p-2">
+          <div class="relative">
+            <span class="absolute inset-y-0 start-0 flex items-center ps-2.5 text-navy-400">🔍</span>
+            <input type="search" id="s-currency-search" placeholder="ابحث عن العملة، الرمز، الاسم..." class="w-full rounded-lg border border-navy-200 bg-navy-50/50 py-2 pe-3 ps-8 text-sm font-bold text-navy-900 placeholder:text-navy-400 focus:border-gold-400 focus:outline-none focus:ring-2 focus:ring-gold-200" autocomplete="off">
+          </div>
+          <div class="mt-2 flex items-center justify-between">
+            <span class="text-[11px] font-black text-navy-400">${currencies.length} عملة رسمية</span>
+            <span class="rounded-full bg-gold-100 px-2 py-0.5 text-[10px] font-black text-gold-800">الجنيه المصري أولًا</span>
+          </div>
+        </div>
+        <div id="s-currency-list" class="max-h-60 overflow-y-auto p-1.5">
+          ${currencies.map(c => `
+            <button type="button" data-currency="${c.code}" class="currency-option flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-start transition-all hover:bg-gold-50 ${c.code === current.code ? 'bg-navy-900 text-gold-100 shadow' : 'text-navy-800'}">
+              <span class="flex h-8 w-8 items-center justify-center rounded-lg ${c.code === current.code ? 'bg-white/10' : 'bg-gold-50'} text-lg">${c.flag}</span>
+              <span class="flex-1 leading-tight">
+                <span class="flex items-center gap-2">
+                  <span class="text-[13px] font-black">${c.name_ar}</span>
+                  <span class="rounded-md bg-navy-100 px-1.5 py-0.5 text-[10px] font-black ${c.code === current.code ? 'bg-white/20 text-gold-200' : 'text-navy-600'}">${c.code}</span>
+                  ${c.code === 'EGP' ? '<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-black text-emerald-800">افتراضي</span>' : ''}
+                </span>
+                <span class="mt-0.5 block text-[11px] font-bold ${c.code === current.code ? 'text-gold-300' : 'text-navy-500'}">${c.name_en} • ${c.symbol} • مثال: ${new Intl.NumberFormat('ar-EG').format(1250)} ${c.symbol}</span>
+              </span>
+              ${c.code === current.code ? '<span class="text-gold-400">✓</span>' : ''}
+            </button>
+          `).join('')}
+        </div>
+        <div class="border-t border-navy-100 bg-navy-50/50 p-2.5">
+          <p class="text-[11px] font-bold leading-relaxed text-navy-500">💡 يتم تطبيق العملة المختارة على جميع المبالغ: الاشتراكات، دفعات الخصم، التقارير، ودفتر الخزينة. يُحفظ كود العملة (مثل EGP) في قاعدة البيانات.</p>
+        </div>
+      </div>
+      <input type="hidden" id="s-currency" value="${current.code}">
+    </div>
+  `;
+
+  const btn = document.getElementById('s-currency-btn');
+  const dropdown = document.getElementById('s-currency-dropdown');
+  const search = document.getElementById('s-currency-search');
+  const hiddenInput = document.getElementById('s-currency');
+
+  if (!btn || !dropdown) return;
+
+  function toggleDropdown(show) {
+    const isHidden = dropdown.classList.contains('hidden');
+    const shouldShow = typeof show === 'boolean' ? show : isHidden;
+    dropdown.classList.toggle('hidden', !shouldShow);
+    if (shouldShow && search) {
+      search.focus();
+      search.value = '';
+      filterList('');
+    }
+  }
+
+  function filterList(term) {
+    const t = String(term || '').toLowerCase().trim();
+    const options = wrapper.querySelectorAll('.currency-option');
+    options.forEach(opt => {
+      const code = opt.dataset.currency || '';
+      const cur = currencies.find(c => c.code === code);
+      if (!cur) { opt.style.display = 'none'; return; }
+      const hay = `${cur.code} ${cur.name_ar} ${cur.name_en} ${cur.symbol} ${cur.symbol_en}`.toLowerCase();
+      opt.style.display = hay.includes(t) ? '' : 'none';
+    });
+  }
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleDropdown();
+  });
+
+  if (search) {
+    search.addEventListener('input', (e) => filterList(e.target.value));
+    search.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        toggleDropdown(false);
+        btn.focus();
+      }
+    });
+  }
+
+  wrapper.querySelectorAll('.currency-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const code = opt.dataset.currency;
+      if (!code) return;
+      settingsDraft.currency = code;
+      if (hiddenInput) hiddenInput.value = code;
+      // إعادة الرسم لتحديث الزر والقائمة
+      renderCurrencySelector();
+      // تحديث شريط العلامة التجارية فورًا
+      try { refreshBrand(); } catch (e) {}
+      if (typeof toast === 'function') {
+        const cur = (typeof getCurrency !== 'undefined') ? getCurrency(code) : currencies.find(c => c.code === code);
+        toast(`تم اختيار العملة: ${cur ? cur.name_ar : code} (${code})`, 'info');
+      }
+    });
+  });
+
+  // إغلاق عند النقر خارج
+  function onDocClick(e) {
+    if (!wrapper.contains(e.target)) {
+      dropdown.classList.add('hidden');
+    }
+  }
+  document.addEventListener('click', onDocClick, { once: false });
+
+  // تنظيف عند إعادة الرسم
+  wrapper._cleanup = () => document.removeEventListener('click', onDocClick);
 }
 
 function renderLogoPreview() {
