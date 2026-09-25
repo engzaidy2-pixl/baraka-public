@@ -121,13 +121,16 @@ document.addEventListener('keydown', (e) => {
 /* ── تسجيل الخروج ── */
 async function logout() {
   B_STORE.del('baraka_b.session');
-  /* إنهاء جلسة Supabase Auth (يمسح رمز الدخول من localStorage/sessionStorage) */
+  /* إنهاء جلسة Supabase Auth */
   const sb = (typeof sbClient === 'function') ? sbClient() : null;
   if (sb) {
     try { await sb.auth.signOut(); }
     catch (e) { console.warn('[Baraka] signOut failed:', e?.message || e); }
   }
-  window.location.href = 'index.html';
+  /* تحديد مسار الصفحة الرئيسية حسب الموقع الحالي */
+  const path = window.location.pathname;
+  const rootPath = path.includes('/modules/') ? '../../index.html' : 'index.html';
+  window.location.href = rootPath;
 }
 
 /* ── تصدير في بيئة Node (للاختبارات) مع الحفاظ على التوافق مع المتصفح ── */
