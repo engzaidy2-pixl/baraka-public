@@ -534,9 +534,10 @@
 
   const MEMBERS_SELECT = [
     'id', 'member_number', 'full_name', 'phone', 'national_id', 'employee_number',
-    'status', 'service_status', 'membership_date', 'membership_type_id', 'employer_id',
+    'status', 'service_status', 'collection_method',
+    'membership_date', 'membership_type_id', 'employer_id',
     'membership_types:membership_type_id ( id, name )',
-    'employers:employer_id ( id, name )',
+    'employers:employer_id ( id, name, scope )',
   ].join(', ');
 
   const MEMBER_STATUS = {
@@ -545,7 +546,30 @@
     hidden:    { label: 'مخفي',  cls: 'member-badge-hidden' },
   };
 
-  const MEMBER_SERVICE_STATUS = { active: 'على رأس العمل', retired: 'متقاعد', other: 'أخرى' };
+  const MEMBER_SERVICE_STATUS = {
+    active:   'على رأس العمل',
+    retired:  'متقاعد',
+    external: 'خارج نطاق جهات العمل',
+    other:    'أخرى',
+  };
+
+  const MEMBER_COLLECTION_METHOD = {
+    salary_deduction: 'خصم راتب',
+    cash:             'نقدي',
+    bank_transfer:    'تحويل بنكي',
+  };
+
+  const EMPLOYER_SCOPE = {
+    internal: 'داخلية',
+    external: 'خارجية',
+  };
+
+  const SERVICE_TO_SCOPE = {
+    active:   'internal',
+    external: 'external',
+    retired:  null,
+    other:    null,
+  };
 
   const MEMBER_FILTER_LABELS = {
     q:                   'بحث',
@@ -762,6 +786,9 @@
       +     '<span class="member-badge ' + status.cls + '">' + esc(status.label) + '</span>'
       +     (mem.service_status
               ? '<span class="member-badge-service">' + esc(MEMBER_SERVICE_STATUS[mem.service_status] || mem.service_status) + '</span>'
+              : '')
+      +     (mem.collection_method && mem.collection_method !== 'cash'
+              ? '<span class="member-badge-service">' + esc(MEMBER_COLLECTION_METHOD[mem.collection_method] || mem.collection_method) + '</span>'
               : '')
       +   '</td>'
       +   '<td data-label="إجراءات">'
@@ -988,6 +1015,10 @@
     section.addEventListener('click', (e) => {
       if (e.target.closest('[data-member-action="add"]')) openMemberModal(null);
     });
+
+    bindMemberStatusListener();
+    bindQuickEmployerModal();
+    bindQuickEmployerTrigger();
   }
 
   /* ═══════════════════════════════════════════════
@@ -1039,7 +1070,7 @@
     try {
       const [typesRes, employersRes] = await Promise.all([
         sb.from('membership_types').select('id, name').eq('status', 'active').order('sort_order', { ascending: true }),
-        sb.from('employers').select('id, name').eq('status', 'active').order('name', { ascending: true }),
+        sb.from('employers').select('id, name, scope').eq('status', 'active').order('name', { ascending: true }),
       ]);
 
       if (!typesRes.error)     STATE.members.types     = typesRes.data || [];
@@ -1060,6 +1091,185 @@
     el.innerHTML = '<option value="">' + esc(emptyLabel || 'الكل') + '</option>'
       + (items || []).map((it) => '<option value="' + esc(it.id) + '">' + esc(it.name) + '</option>').join('');
     if (current) el.value = current;
+  }
+
+  /* ═══════════════════════════════════════════════
+     النموذج الثلاثي — دوال مساعدة
+     ═══════════════════════════════════════════════ */
+  function employerScopeForStatus(status) {
+    return SERVICE_TO_SCOPE[status] || null;
+  }
+
+  function fillMemberEmployerSelect(scope) {
+    const el = document.getElementById('member-employer');
+    if (!el) return;
+    const current = el.value;
+    const all = STATE.members.employers || [];
+    let filtered = all;
+    if (scope) {
+      filtered = all.filter((e) => (e.scope || 'internal') === scope);
+    }
+    el.innerHTML = '<option value="">— بدون —</option>'
+      + filtered.map((it) => '<option value="' + esc(it.id) + '">' + esc(it.name) + '</option>').join('');
+    if (current) {
+      const existsInFiltered = filtered.some((x) => String(x.id) === String(current));
+      if (!existsInFiltered) {
+        const original = all.find((x) => String(x.id) === String(current));
+        if (original) {
+          const opt = document.createElement('option');
+          opt.value = String(original.id);
+          opt.textContent = (original.name || '') + ' (' + (EMPLOYER_SCOPE[original.scope || 'internal'] || original.scope || '—') + ')';
+          el.appendChild(opt);
+        }
+      }
+      el.value = current;
+    }
+  }
+
+  function applyCollectionDefault(status) {
+    const collEl = document.getElementById('member-collection-method');
+    if (!collEl) return;
+    if (MEMBER_EDIT && MEMBER_EDIT.id) return;
+    if (status === 'active') {
+      collEl.value = 'salary_deduction';
+    } else if (status === 'external') {
+      collEl.value = 'cash';
+    } else {
+      collEl.value = 'cash';
+    }
+  }
+
+  function toggleEmployerField() {
+    const statusEl = document.getElementById('member-service-status');
+    const field = document.getElementById('member-employer-field');
+    const hint = document.getElementById('member-employer-hint');
+    const required = document.getElementById('member-employer-required');
+    const employerSelect = document.getElementById('member-employer');
+    if (!statusEl) return;
+    const status = statusEl.value;
+    const scope = employerScopeForStatus(status);
+    fillMemberEmployerSelect(scope);
+    if (!field) return;
+    if (status === 'active' || status === 'external') {
+      field.style.display = '';
+      if (employerSelect) employerSelect.required = true;
+      if (required) required.hidden = false;
+      if (hint) {
+        if (status === 'active') hint.textContent = 'مطلوب اختيار جهة داخلية (معتمدة للخصم)';
+        else hint.textContent = 'مطلوب اختيار جهة خارجية (بدون خصم)';
+      }
+    } else {
+      if (required) required.hidden = true;
+      if (employerSelect) employerSelect.required = false;
+      if (hint) {
+        hint.textContent = status === 'retired' ? 'المتقاعدون بلا جهة عمل' : 'اختيار جهة العمل اختياري';
+      }
+      field.style.display = '';
+      if (!scope) {
+        fillMemberEmployerSelect(null);
+      }
+    }
+    applyCollectionDefault(status);
+  }
+
+  function bindMemberStatusListener() {
+    const statusEl = document.getElementById('member-service-status');
+    if (!statusEl || statusEl.dataset.tripleBound === '1') return;
+    statusEl.dataset.tripleBound = '1';
+    statusEl.addEventListener('change', () => {
+      toggleEmployerField();
+    });
+  }
+
+  function openQuickEmployerModal() {
+    const modal = document.getElementById('quick-employer-modal');
+    if (!modal) return;
+    const statusEl = document.getElementById('member-service-status');
+    const currentStatus = statusEl ? statusEl.value : 'active';
+    const scope = employerScopeForStatus(currentStatus) || 'internal';
+    setVal('quick-employer-name', '');
+    setVal('quick-employer-scope', scope);
+    setVal('quick-employer-code', '');
+    const errEl = document.getElementById('quick-employer-error');
+    if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
+    modal.classList.remove('hidden');
+    const first = document.getElementById('quick-employer-name');
+    if (first) first.focus();
+  }
+
+  function closeQuickEmployerModal() {
+    const modal = document.getElementById('quick-employer-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+  }
+
+  async function saveQuickEmployer() {
+    const sb = membersSb();
+    if (!sb) { if (typeof toast === 'function') toast('لا يوجد اتصال بقاعدة البيانات', 'error'); return; }
+    const nameEl = document.getElementById('quick-employer-name');
+    const scopeEl = document.getElementById('quick-employer-scope');
+    const codeEl = document.getElementById('quick-employer-code');
+    const errEl = document.getElementById('quick-employer-error');
+    const name = nameEl ? nameEl.value.trim() : '';
+    const scope = scopeEl ? scopeEl.value : 'internal';
+    const code = codeEl ? codeEl.value.trim() : '';
+    if (!name) {
+      if (errEl) { errEl.textContent = 'اسم الجهة حقل مطلوب.'; errEl.hidden = false; }
+      if (typeof toast === 'function') toast('اسم الجهة حقل مطلوب', 'error');
+      return;
+    }
+    const btn = document.getElementById('btn-save-quick-employer');
+    if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الحفظ…'; }
+    try {
+      const payload = { name: name, scope: scope, status: 'active' };
+      if (code) payload.code = code;
+      const { data, error } = await sb.from('employers').insert(payload).select('id, name, scope').single();
+      if (error) throw error;
+      if (data) {
+        STATE.members.employers.push(data);
+        STATE.members.employers.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ar'));
+      } else {
+        STATE.members.optionsLoaded = false;
+        await loadMembersOptions();
+      }
+      const statusEl = document.getElementById('member-service-status');
+      const curScope = statusEl ? employerScopeForStatus(statusEl.value) : null;
+      fillMemberEmployerSelect(curScope);
+      if (data && data.id) {
+        setVal('member-employer', data.id);
+      }
+      closeQuickEmployerModal();
+      if (typeof toast === 'function') toast('تمت إضافة جهة العمل بنجاح', 'success');
+      invalidateMembersOptions();
+    } catch (e) {
+      console.error('[Baraka Membership] saveQuickEmployer error:', e);
+      const msg = (e && e.code === '23505') ? 'اسم الجهة أو الرمز مستخدم مسبقًا.' : 'تعذَّر حفظ جهة العمل — تحقَّق من المدخلات.';
+      if (errEl) { errEl.textContent = msg; errEl.hidden = false; }
+      if (typeof toast === 'function') toast(msg, 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'حفظ'; }
+    }
+  }
+
+  function bindQuickEmployerModal() {
+    const modal = document.getElementById('quick-employer-modal');
+    if (!modal || modal.dataset.tripleBound === '1') return;
+    modal.dataset.tripleBound = '1';
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal || e.target.closest('[data-close-quick-employer-modal]')) closeQuickEmployerModal();
+    });
+    const saveBtn = document.getElementById('btn-save-quick-employer');
+    if (saveBtn) saveBtn.addEventListener('click', saveQuickEmployer);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeQuickEmployerModal();
+    });
+  }
+
+  function bindQuickEmployerTrigger() {
+    const btn = document.getElementById('btn-quick-add-employer');
+    if (!btn || btn.dataset.tripleTriggerBound === '1') return;
+    btn.dataset.tripleTriggerBound = '1';
+    btn.addEventListener('click', openQuickEmployerModal);
   }
 
   /* ═══════════════════════════════════════════════
@@ -1111,8 +1321,7 @@
 
     if (!STATE.members.optionsLoaded) await loadMembersOptions();
 
-    fillMembersSelect('member-type',     STATE.members.types,     '— بدون —');
-    fillMembersSelect('member-employer', STATE.members.employers, '— بدون —');
+    fillMembersSelect('member-type', STATE.members.types, '— بدون —');
 
     setVal('member-id',              data ? data.id : '');
     setVal('member-full-name',       data ? data.full_name || '' : '');
@@ -1121,10 +1330,13 @@
     setVal('member-number-input',    data ? data.member_number || '' : '');
     setVal('member-employee-number', data ? data.employee_number || '' : '');
     setVal('member-type',            data && data.membership_type_id ? data.membership_type_id : '');
-    setVal('member-employer',        data && data.employer_id ? data.employer_id : '');
     setVal('member-service-status',  data ? data.service_status || 'active' : 'active');
+    setVal('member-collection-method', data ? data.collection_method || 'cash' : 'cash');
     setVal('member-status',          data ? data.status || 'active' : 'active');
     setVal('member-date',            data && data.membership_date ? String(data.membership_date).slice(0, 10) : '');
+
+    toggleEmployerField();
+    setVal('member-employer', data && data.employer_id ? data.employer_id : '');
 
     document.getElementById('member-modal-title').textContent = MEMBER_EDIT.readOnly
       ? 'بيانات العضو'
@@ -1168,16 +1380,36 @@
       return el ? String(el.value || '').trim() : '';
     };
 
+    const serviceStatus = val('member-service-status') || 'active';
+    const employerIdRaw = val('member-employer');
+    const employerId = employerIdRaw ? Number(employerIdRaw) : null;
+    const collectionMethod = val('member-collection-method') || 'cash';
+
+    if ((serviceStatus === 'active' || serviceStatus === 'external') && !employerId) {
+      fail(serviceStatus === 'active' ? 'يجب اختيار جهة عمل داخلية للعضو على رأس العمل.' : 'يجب اختيار جهة عمل خارجية للعضو خارج النطاق.');
+      return;
+    }
+
+    if (employerId) {
+      const employer = (STATE.members.employers || []).find((e) => Number(e.id) === Number(employerId));
+      const expectedScope = employerScopeForStatus(serviceStatus);
+      if (expectedScope && employer && (employer.scope || 'internal') !== expectedScope) {
+        fail(expectedScope === 'internal' ? 'جهة العمل المختارة ليست داخلية — اختر جهة داخلية معتمدة للخصم.' : 'جهة العمل المختارة ليست خارجية — اختر جهة خارجية.');
+        return;
+      }
+    }
+
     const payload = {
-      full_name:         name,
-      national_id:       val('member-national-id') || null,
-      phone:             val('member-phone') || null,
-      employee_number:   val('member-employee-number') || null,
+      full_name:          name,
+      national_id:        val('member-national-id') || null,
+      phone:              val('member-phone') || null,
+      employee_number:    val('member-employee-number') || null,
       membership_type_id: val('member-type') ? Number(val('member-type')) : null,
-      employer_id:        val('member-employer') ? Number(val('member-employer')) : null,
-      service_status:    val('member-service-status') || 'active',
-      status:            val('member-status') || 'active',
-      membership_date:   val('member-date') || null,
+      employer_id:        (serviceStatus === 'retired' || serviceStatus === 'other') ? null : employerId,
+      service_status:     serviceStatus,
+      collection_method:  collectionMethod,
+      status:             val('member-status') || 'active',
+      membership_date:    val('member-date') || null,
     };
 
     const memberNumber = val('member-number-input');
@@ -1410,7 +1642,7 @@
      ═══════════════════════════════════════════════ */
   STATE.employers = {
     list: [],
-    filters: { q: '', status: '' },
+    filters: { q: '', status: '', scope: '' },
     loading: false,
     loaded: false,
     editId: null,
@@ -1463,10 +1695,12 @@
       { id: config.inputs.phone,   key: 'phone' },
       { id: config.inputs.contact, key: 'contact_person' },
       { id: config.inputs.email,   key: 'email' },
+      { id: config.inputs.scope,   key: 'scope' },
     ].filter((f) => f.id);
 
     function hasFilters() {
-      return Boolean(st.filters.q || st.filters.status);
+      const hasScope = config.hasScope && st.filters.scope;
+      return Boolean(st.filters.q || st.filters.status || hasScope);
     }
 
     async function load() {
@@ -1515,6 +1749,7 @@
 
       return st.list.filter((row) => {
         if (st.filters.status && row.status !== st.filters.status) return false;
+        if (config.hasScope && st.filters.scope && (row.scope || 'internal') !== st.filters.scope) return false;
         if (!term) return true;
         const hay = normalizeHeader([
           row.name, row.code, row.contact_person, row.phone, row.email, row.address,
@@ -1591,6 +1826,10 @@
       const chips = [];
       if (st.filters.q)      chips.push('<span class="members-chip">بحث: ' + esc(st.filters.q) + '</span>');
       if (st.filters.status) chips.push('<span class="members-chip">الحالة: ' + esc(dirStatusOf(st.filters.status).label) + '</span>');
+      if (config.hasScope && st.filters.scope) {
+        const scopeLabel = (typeof EMPLOYER_SCOPE !== 'undefined' && EMPLOYER_SCOPE[st.filters.scope]) ? EMPLOYER_SCOPE[st.filters.scope] : st.filters.scope;
+        chips.push('<span class="members-chip">النطاق: ' + esc(scopeLabel) + '</span>');
+      }
       host.innerHTML = chips.join('');
     }
 
@@ -1613,7 +1852,7 @@
     }
 
     function resetFilters() {
-      st.filters = { q: '', status: '' };
+      st.filters = config.hasScope ? { q: '', status: '', scope: '' } : { q: '', status: '' };
 
       const searchInput = $(config.ids.search);
       if (searchInput) searchInput.value = '';
@@ -1621,6 +1860,10 @@
       if (clear) clear.hidden = true;
       const filterEl = $(config.ids.statusFilter);
       if (filterEl) filterEl.value = '';
+      if (config.hasScope && config.ids.scopeFilter) {
+        const scopeEl = $(config.ids.scopeFilter);
+        if (scopeEl) scopeEl.value = '';
+      }
 
       renderAll();
     }
@@ -1638,6 +1881,9 @@
       setVal(config.ids.idInput, data ? data.id : '');
       fieldBindings.forEach((f) => setVal(f.id, data ? (data[f.key] || '') : ''));
       setVal(config.ids.statusSelect, data ? data.status || 'active' : 'active');
+      if (config.hasScope && config.inputs.scope) {
+        setVal(config.inputs.scope, data ? (data.scope || 'internal') : 'internal');
+      }
 
       const titleEl = $(config.ids.modalTitle);
       if (titleEl) titleEl.textContent = st.editId ? config.labels.editTitle : config.labels.addTitle;
@@ -1685,6 +1931,9 @@
         status:         val(config.ids.statusSelect) || 'active',
       };
       if (config.inputs.email) payload.email = email;
+      if (config.hasScope && config.inputs.scope) {
+        payload.scope = val(config.inputs.scope) || 'internal';
+      }
 
       const btn = $(config.ids.saveBtn);
       if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الحفظ…'; }
@@ -1788,6 +2037,11 @@
       const filterEl = $(config.ids.statusFilter);
       if (filterEl) filterEl.addEventListener('change', () => setFilter('status', filterEl.value));
 
+      if (config.hasScope && config.ids.scopeFilter) {
+        const scopeFilterEl = $(config.ids.scopeFilter);
+        if (scopeFilterEl) scopeFilterEl.addEventListener('change', () => setFilter('scope', scopeFilterEl.value));
+      }
+
       const resetBtn = $(config.ids.resetBtn);
       if (resetBtn) resetBtn.addEventListener('click', resetFilters);
 
@@ -1833,6 +2087,9 @@
       +     '<span class="member-name">' + esc(row.name || '—') + '</span>'
       +     (row.address ? '<span class="member-sub">' + esc(row.address) + '</span>' : '')
       +   '</td>'
+      +   '<td data-label="النطاق">'
+      +     '<span class="member-badge-service">' + esc(EMPLOYER_SCOPE[row.scope || 'internal'] || '—') + '</span>'
+      +   '</td>'
       +   '<td data-label="الرمز">'
       +     (row.code ? '<span class="member-number">' + esc(row.code) + '</span>' : '<span class="member-muted">—</span>')
       +   '</td>'
@@ -1858,7 +2115,8 @@
     table: 'employers',
     sectionId: 'tab-employers',
     logTag: 'Employers',
-    cols: 6,
+    cols: 7,
+    hasScope: true,
     state: STATE.employers,
     actionAttr: 'data-employer-action',
     idAttr: 'data-employer-id',
@@ -1867,6 +2125,7 @@
       search:        'employers-search',
       searchClear:   'employers-search-clear',
       statusFilter:  'filter-employers-status',
+      scopeFilter:   'filter-employers-scope',
       resetBtn:      'btn-reset-employers-filters',
       addBtn:        'btn-add-employer',
       count:         'employers-count',
@@ -1890,6 +2149,7 @@
       phone:   'employer-phone',
       contact: 'employer-contact',
       email:   null,
+      scope:   'employer-scope',
     },
     labels: {
       one:           'جهة العمل',

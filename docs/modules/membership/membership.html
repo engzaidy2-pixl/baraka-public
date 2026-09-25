@@ -314,6 +314,7 @@
                   <option value="">الجميع</option>
                   <option value="active">على رأس العمل</option>
                   <option value="retired">متقاعد</option>
+                  <option value="external">خارج نطاق جهات العمل</option>
                   <option value="other">أخرى</option>
                 </select>
               </div>
@@ -408,9 +409,20 @@
                       <select id="member-type" class="membership-input"></select>
                     </div>
 
-                    <div class="member-field">
-                      <label class="membership-label" for="member-employer">جهة العمل</label>
-                      <select id="member-employer" class="membership-input"></select>
+                    <div class="member-field" id="member-employer-field">
+                      <label class="membership-label" for="member-employer">
+                        جهة العمل
+                        <span id="member-employer-required" class="field-required" hidden>*</span>
+                      </label>
+                      <div class="field-with-action">
+                        <select id="member-employer" class="membership-input">
+                          <option value="">— بدون —</option>
+                        </select>
+                        <button type="button" id="btn-quick-add-employer" class="btn-inline" title="إضافة جهة عمل جديدة">
+                          + جهة
+                        </button>
+                      </div>
+                      <small id="member-employer-hint" class="field-hint"></small>
                     </div>
 
                     <div class="member-field">
@@ -418,7 +430,17 @@
                       <select id="member-service-status" class="membership-input">
                         <option value="active">على رأس العمل</option>
                         <option value="retired">متقاعد</option>
+                        <option value="external">خارج نطاق جهات العمل</option>
                         <option value="other">أخرى</option>
+                      </select>
+                    </div>
+
+                    <div class="member-field">
+                      <label class="membership-label" for="member-collection-method">طريقة التحصيل</label>
+                      <select id="member-collection-method" class="membership-input">
+                        <option value="cash">نقدي</option>
+                        <option value="salary_deduction">خصم راتب</option>
+                        <option value="bank_transfer">تحويل بنكي</option>
                       </select>
                     </div>
 
@@ -487,6 +509,15 @@
         </select>
       </div>
 
+      <div class="members-filter">
+        <label class="membership-label" for="filter-employers-scope">النطاق</label>
+        <select id="filter-employers-scope" class="membership-input" data-employer-filter="scope">
+          <option value="">كل النطاقات</option>
+          <option value="internal">داخلية</option>
+          <option value="external">خارجية</option>
+        </select>
+      </div>
+
       <div class="members-filter members-filter-reset">
         <button type="button" id="btn-reset-employers-filters" class="membership-btn membership-btn-outline membership-btn-sm">
           <span aria-hidden="true">↺</span> مسح الفلاتر
@@ -507,6 +538,7 @@
       <thead>
         <tr>
           <th scope="col">الاسم</th>
+          <th scope="col">النطاق</th>
           <th scope="col">الرمز</th>
           <th scope="col">المسؤول</th>
           <th scope="col">الهاتف</th>
@@ -568,6 +600,17 @@
               <input type="text" id="employer-contact" class="membership-input" autocomplete="off">
             </div>
 
+            <div class="member-field">
+              <label class="membership-label" for="employer-scope">نطاق الجهة</label>
+              <select id="employer-scope" class="membership-input">
+                <option value="internal">داخلية (معتمدة للخصم)</option>
+                <option value="external">خارجية (بدون خصم)</option>
+              </select>
+              <small class="membership-hint">
+                الجهات الداخلية: الأعضاء على رأس العمل. الخارجية: أعضاء يعملون خارج النطاق.
+              </small>
+            </div>
+
             <div class="member-field member-field-full">
               <label class="membership-label" for="employer-status">الحالة</label>
               <select id="employer-status" class="membership-input">
@@ -584,6 +627,38 @@
       <div class="membership-modal-footer">
         <button type="button" class="membership-btn membership-btn-outline" data-close-employer-modal>إلغاء</button>
         <button type="button" class="membership-btn membership-btn-accent" id="btn-save-employer">حفظ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5.1 نافذة إضافة جهة سريعة -->
+  <div id="quick-employer-modal" class="membership-modal-backdrop hidden">
+    <div class="membership-modal" style="max-width: 420px;" role="dialog" aria-modal="true" aria-labelledby="quick-employer-title">
+      <div class="membership-modal-header">
+        <h3 class="membership-modal-title" id="quick-employer-title">إضافة جهة عمل جديدة</h3>
+        <button type="button" class="membership-btn membership-btn-outline membership-btn-sm" data-close-quick-employer-modal aria-label="إغلاق">✕</button>
+      </div>
+      <div class="membership-modal-body">
+        <div id="quick-employer-error" class="member-form-error" hidden></div>
+        <div class="member-field">
+          <label class="membership-label" for="quick-employer-name">اسم الجهة</label>
+          <input type="text" id="quick-employer-name" maxlength="120" placeholder="مثال: شركة الأمل" class="membership-input">
+        </div>
+        <div class="member-field" style="margin-top:.75rem">
+          <label class="membership-label" for="quick-employer-scope">النطاق</label>
+          <select id="quick-employer-scope" class="membership-input">
+            <option value="internal">داخلية (معتمدة للخصم)</option>
+            <option value="external">خارجية (بدون خصم)</option>
+          </select>
+        </div>
+        <div class="member-field" style="margin-top:.75rem">
+          <label class="membership-label" for="quick-employer-code">الرمز (اختياري)</label>
+          <input type="text" id="quick-employer-code" maxlength="30" class="membership-input">
+        </div>
+      </div>
+      <div class="membership-modal-footer">
+        <button type="button" class="membership-btn membership-btn-outline" data-close-quick-employer-modal>إلغاء</button>
+        <button type="button" class="membership-btn membership-btn-accent" id="btn-save-quick-employer">حفظ</button>
       </div>
     </div>
   </div>

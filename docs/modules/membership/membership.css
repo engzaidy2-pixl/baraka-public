@@ -1813,6 +1813,45 @@
 
 
 /* ═══════════════════════════════════════════════════
+   النموذج الثلاثي — حقول إضافية
+   ═══════════════════════════════════════════════════ */
+.field-with-action {
+  display: flex;
+  gap: .5rem;
+  align-items: stretch;
+}
+.field-with-action select { flex: 1; }
+
+.btn-inline {
+  flex-shrink: 0;
+  padding: 0 .75rem;
+  border-radius: .5rem;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 700;
+  font-size: .8rem;
+  cursor: pointer;
+}
+.btn-inline:hover { background: #e2e8f0; }
+
+.field-hint {
+  display: block;
+  margin-top: .25rem;
+  font-size: .7rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.field-required {
+  color: #dc2626;
+  margin-inline-start: .25rem;
+  font-weight: 800;
+}
+
+.modal-panel-sm { max-width: 420px; }
+
+/* ═══════════════════════════════════════════════════
    تقليل الحركة (Accessibility)
    ═══════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
