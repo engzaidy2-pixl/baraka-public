@@ -1148,6 +1148,12 @@
       STATE.members.deductionEntities = [];
       STATE.members.optionsLoaded = false;
     }
+    /* الحزمة ج: إلغاء كاش قائمة جهات الخصم في نافذة الدفعات أيضًا —
+       حتى تنعكس إضافة/حذف الجهات فورًا في batch-entity select */
+    if (STATE.deductionBatches) {
+      STATE.deductionBatches.entitiesOptions = [];
+      STATE.deductionBatches.entitiesOptionsLoaded = false;
+    }
   }
 
   function fillMembersSelect(id, items, emptyLabel) {
@@ -2244,6 +2250,8 @@
         closeModal();
         if (typeof toast === 'function') toast(isEdit ? config.labels.savedEdit : config.labels.savedAdd, 'success');
         invalidateMembersOptions();
+        /* الحزمة ج: حفظ جهة خصم → إلغاء كاش قوائم جهات الخصم (نافذة الدفعات + النموذج الثلاثي) */
+        if (config.table === 'deduction_entities') invalidateDeductionEntitiesOptions();
         load();
       } catch (e) {
         console.error('[Baraka Membership] ' + config.logTag + ' save error:', e);
@@ -2261,7 +2269,15 @@
       if (!record) return;
 
       const name = record.name || config.labels.one;
-      if (!window.confirm('سيتم حذف «' + name + '» نهائيًا.\nهل أنت متأكد من المتابعة؟')) return;
+      /* الحزمة ج: حذف «فرع» جهة خصم (تابع، غير ذاتي) — رسالة تشرح أثر
+         المشغّل reassign: نقل الأعضاء تلقائيًا إلى الصف الذاتي للجهة */
+      const isBranchEntity = config.table === 'deduction_entities' && !record.is_self;
+      const confirmMsg = isBranchEntity
+        ? ('سيتم حذف «' + name + '» نهائيًا.\n'
+           + 'سيتم نقل الأعضاء المرتبطين بهذا الفرع تلقائيًا إلى جهة الخصم الرئيسية (الصف الذاتي) لجهة العمل.\n'
+           + 'هل أنت متأكد من المتابعة؟')
+        : ('سيتم حذف «' + name + '» نهائيًا.\nهل أنت متأكد من المتابعة؟');
+      if (!window.confirm(confirmMsg)) return;
 
       const sb = membersSb();
       if (!sb) { if (typeof toast === 'function') toast('لا يوجد اتصال بقاعدة البيانات', 'error'); return; }
@@ -2272,6 +2288,8 @@
 
         if (typeof toast === 'function') toast(config.labels.deleted, 'success');
         invalidateMembersOptions();
+        /* الحزمة ج: حذف جهة خصم → إلغاء كاش قوائم جهات الخصم */
+        if (config.table === 'deduction_entities') invalidateDeductionEntitiesOptions();
         load();
       } catch (e) {
         console.error('[Baraka Membership] ' + config.logTag + ' delete error:', e);
@@ -2691,6 +2709,7 @@
       if (typeof toast === 'function') toast(isEdit ? 'تم حفظ فرع الاستحقاق' : 'تمت إضافة فرع الاستحقاق', 'success');
       resetSubEntityForm();
       invalidateMembersOptions();
+      invalidateDeductionEntitiesOptions(); /* الحزمة ج: تحديث كاش قوائم جهات الخصم */
       loadSubEntities(employerId);
       EntitiesTab.load(); /* تحديث جدول جهات الخصم العام */
     } catch (e) {
@@ -2726,6 +2745,7 @@
       if (error) throw error;
 
       if (typeof toast === 'function') toast('تم حذف فرع الاستحقاق', 'success');
+      invalidateDeductionEntitiesOptions(); /* الحزمة ج: تحديث كاش قوائم جهات الخصم */
       loadSubEntities(employerId);
       EntitiesTab.load(); /* تحديث جدول جهات الخصم العام */
     } catch (e) {
@@ -4023,7 +4043,7 @@
      خطوات التنفيذ:
        1) fetchMembersForBulk(scope) — جلب الأعضاء حسب النطاق.
        2) checkExistingBatches / checkExistingSubscriptions — التكرار.
-       3) groupMembersByEmployer — التجميع (جهات + مطالبة نقدية).
+       3) groupMembersByDeductionEntity — التجميع حسب جهة الخصم (+ مطالبة نقدية).
        4) createBatchAndSubscriptions — الحفظ لكل مجموعة
           (Partial Failure: فشل مجموعة لا يُسقط باقي المجموعات).
      المبالغ من membership_fees (سعر الفترة) لكل membership_type.
@@ -4115,6 +4135,8 @@
     'status', 'service_status', 'collection_method',
     'employer_id', 'deduction_entity_id', 'membership_type_id',
     'employers:employer_id ( id, name )',
+    /* الحزمة ج: اسم جهة الخصم مضمّن — مفتاح التجميع الجديد */
+    'deduction_entities:deduction_entity_id ( id, name, is_self )',
   ].join(', ');
 
   async function fetchMembersForBulk(scope, year, month) {
@@ -4123,17 +4145,19 @@
 
     // ملاحظة: year/month ليسا جزءًا من تصفية الأعضاء — يحتفظان بالتواقيع.
     // تضييق النطاق:
-    //   all       → كل الأعضاء النشطين (يُقسَّمون لاحقًا في groupMembersByEmployer)
+    //   all       → كل الأعضاء النشطين (يُقسَّمون لاحقًا في groupMembersByDeductionEntity)
     //   employees → service_status=active + collection_method=salary_deduction + جهة عمل
     //   pension   → متقاعد/خارج الخدمة أو تحصيل نقدي.
     //                (قيم members.collection_method الفعلية: 'cash' | 'salary_deduction' —
     //                 'cash_demand' هو مصطلح الدفعات وليس طريقة تحصيل عضو.)
+    //
+    // الحزمة ج: عمود deduction_entity_id مضمون الوجود بعد ترحيل entity-linkage
+    // (يُملأ تلقائيًا بالصف الذاتي عبر المشغّل) — حُذفت معالجة 42703 الاحتياطية.
 
-    // بناء الاستعلام لكل صفحة (يسمح بتبديل قائمة الحقول عند 42703 دون إعادة بناء يدوية)
-    const buildQuery = (selectSpec) => {
+    const buildQuery = () => {
       let q = sb
         .from('members')
-        .select(selectSpec)
+        .select(BULK_MEMBER_SELECT)
         .eq('status', 'active')
         .order('id', { ascending: true });
       if (scope === 'employees') {
@@ -4144,19 +4168,10 @@
       return q;
     };
 
-    let selectSpec = BULK_MEMBER_SELECT;
     const all = [];
     for (let from = 0; from < BULK_MAX_MEMBERS; from += BULK_PAGE) {
-      let { data, error } = await buildQuery(selectSpec).range(from, from + BULK_PAGE - 1);
-      if (error) {
-        // دفاعًا ضد اختلاف مخطط الجدول: إعادة نفس الصفحة دون عمود deduction_entity_id
-        if (error.code === '42703' && selectSpec === BULK_MEMBER_SELECT) {
-          console.warn('[Baraka Membership] deduction_entity_id column missing — retrying without it');
-          selectSpec = BULK_MEMBER_SELECT.split(',').filter((c) => c.indexOf('deduction_entity_id') === -1).join(',');
-          continue;
-        }
-        throw error;
-      }
+      const { data, error } = await buildQuery().range(from, from + BULK_PAGE - 1);
+      if (error) throw error;
       const rows = data || [];
       all.push(...rows);
       if (rows.length < BULK_PAGE) break;
@@ -4207,9 +4222,15 @@
   }
 
   /* ═══════════════════════════════════════════════
-     4) التجميع حسب جهة العمل
-     ═══════════════════════════════════════════════ */
-  function groupMembersByEmployer(members) {
+     4) التجميع حسب جهة الخصم (الحزمة ج)
+     ═══════════════════════════════════════════════
+     مفتاح التجميع أصبح deduction_entity_id (وليس employer_id):
+     - العمود مضمون لكل عضو خصم راتب (يُملأ يدويًا أو بالصف الذاتي عبر المشغّل)،
+       لذا لم يعد التجميع بحاجة إلى resolveDeductionEntity / VIEW التوافقي.
+     - جهتا عمل تشتركان في جهة خصم واحدة → مجموعة (دفعة) واحدة.
+     - fallback دفاعي: عضو خصم راتب بلا deduction_entity_id (بيانات قديمة
+       قبل الترحيل) يُجمَّع بمفتاح جهة عمله حتى لا يسقط من الدفعات. */
+  function groupMembersByDeductionEntity(members) {
     const salaryGroups = new Map();
     const cashMembers = [];
 
@@ -4218,56 +4239,44 @@
         && m.collection_method === 'salary_deduction'
         && m.employer_id;
       if (isSalary) {
-        const key = Number(m.employer_id);
+        const entityId = Number(m.deduction_entity_id) || null;
+        const key = entityId ? ('de-' + entityId) : ('emp-' + Number(m.employer_id));
         if (!salaryGroups.has(key)) {
           salaryGroups.set(key, {
-            employerId: key,
-            employerName: joinName(m.employers) || ('جهة العمل #' + key),
+            entityId: entityId,
+            entityName: entityId
+              ? (joinName(m.deduction_entities) || ('جهة الخصم #' + entityId))
+              : '',
+            employerId: Number(m.employer_id),
+            employerName: joinName(m.employers) || ('جهة العمل #' + Number(m.employer_id)),
+            /* أسماء جهات العمل المشاركة (قد تتعدد عند جهة خصم مشتركة) */
+            employerNames: new Set(),
             members: [],
           });
         }
-        salaryGroups.get(key).members.push(m);
+        const g = salaryGroups.get(key);
+        const empName = joinName(m.employers) || ('جهة العمل #' + Number(m.employer_id));
+        g.employerNames.add(empName);
+        g.members.push(m);
       } else {
         // متقاعدون / خارج الخدمة / بلا جهة / تحصيل نقدي → مطالبة نقدية واحدة
         cashMembers.push(m);
       }
     });
 
-    return { salaryGroups: Array.from(salaryGroups.values()), cashMembers };
-  }
-
-  /** تحديد جهة الخصم (deduction_entities) الملائمة لمجموعة جهة عمل */
-  async function resolveDeductionEntity(sb, employerId, groupMembers) {
-    // 1) إن كانت غالبية الأعضاء تحمل deduction_entity_id صريحة → تفضيلها
-    const counts = {};
-    (groupMembers || []).forEach((m) => {
-      const eid = Number(m.deduction_entity_id || 0);
-      if (eid > 0) counts[eid] = (counts[eid] || 0) + 1;
+    /* employerName النهائي: أسماء جهات العمل المشاركة مفصولة بـ «، » */
+    const groups = Array.from(salaryGroups.values()).map((g) => {
+      const names = Array.from(g.employerNames);
+      return {
+        entityId: g.entityId,
+        entityName: g.entityName,
+        employerId: g.employerId,
+        employerName: names.length ? names.join('، ') : g.employerName,
+        members: g.members,
+      };
     });
-    let best = null;
-    let bestCount = 0;
-    Object.keys(counts).forEach((k) => {
-      if (counts[k] > bestCount) { bestCount = counts[k]; best = Number(k); }
-    });
-    if (best) return best;
 
-    // 2) الربط many-to-many بين الجهة وجهة الخصم (الافتراضية أولًا)
-    try {
-      const { data, error } = await sb
-        .from('employer_deduction_entities')
-        .select('deduction_entity_id, is_default')
-        .eq('employer_id', employerId)
-        .order('is_default', { ascending: false })
-        .limit(1);
-      if (error) console.warn('[Baraka Membership] resolveDeductionEntity error:', error);
-      if (data && data.length) {
-        const eid = Number(data[0].deduction_entity_id);
-        if (eid > 0) return eid;
-      }
-    } catch (e) {
-      console.warn('[Baraka Membership] resolveDeductionEntity error:', e);
-    }
-    return null;
+    return { salaryGroups: groups, cashMembers };
   }
 
   /* ═══════════════════════════════════════════════
@@ -4474,7 +4483,10 @@
         member_id: Number(m.id),
         employee_number: m.employee_number || '',
         full_name: m.full_name || '',
-        employer_name: isCash ? '' : (group.employerName || ''),
+        /* الحزمة ج: employer_name من جهة العمل الأصلية للعضو (سجل تاريخي دقيق) —
+           وليس من entityName (جهة الخصم)؛ group.employerName هو الـ fallback
+           لأن المجموعة قد تضم أكثر من جهة عمل تشترك في جهة خصم واحدة */
+        employer_name: isCash ? '' : (joinName(m.employers) || group.employerName || ''),
         primary_amount: amount,
         dependents_amount: 0,
         adjustments_amount: 0,
@@ -4620,19 +4632,22 @@
       setBulkProgress(35, 'جارٍ حساب المبالغ وتجميع الجهات…');
       const feesByType = await fetchMonthlyFeesByType(year, month);
 
-      const { salaryGroups, cashMembers } = groupMembersByEmployer(members);
+      /* الحزمة ج: التجميع حسب deduction_entity_id مباشرة —
+         لا حاجة لـ resolveDeductionEntity (العمود مضمون عبر المشغّل) */
+      const { salaryGroups, cashMembers } = groupMembersByDeductionEntity(members);
       const groups = [];
       for (const g of salaryGroups) {
-        const entityId = await resolveDeductionEntity(sb, g.employerId, g.members);
-        if (!entityId) {
-          console.warn('[Baraka] bulk: no deduction entity resolved for employer', g.employerId);
+        if (!g.entityId) {
+          console.warn('[Baraka] bulk: members without deduction_entity_id (pre-migration data?) for employer', g.employerId);
         }
         groups.push({
-          key: 'salary-' + g.employerId,
-          label: 'خصم رواتب — ' + g.employerName,
+          key: g.entityId ? ('entity-' + g.entityId) : ('salary-emp-' + g.employerId),
+          /* اسم جهة الخصم هو الأهم للخطاب/الدفعة — واسم جهة العمل fallback دفاعي */
+          label: 'خصم رواتب — ' + (g.entityName || g.employerName),
           paymentMethod: 'salary_deduction',
-          deductionEntityId: entityId,
-          employerName: g.employerName,
+          deductionEntityId: g.entityId,
+          entityName: g.entityName,
+          employerName: g.employerName, /* يُحفظ في عناصر الدفعة (سجل تاريخي) */
           members: g.members,
         });
       }
@@ -4642,6 +4657,7 @@
           label: 'مطالبة نقدية — متقاعدون وخارج الخدمة',
           paymentMethod: 'cash_demand',
           deductionEntityId: null,
+          entityName: '',
           employerName: '',
           members: cashMembers,
         });
@@ -4814,9 +4830,11 @@
     }
 
     try {
+      /* الحزمة ج: employer_id + is_self + اسم جهة العمل المالكة —
+         للتجميع بـ optgroup وتمييز الصفوف الذاتية */
       const { data, error } = await sb
         .from('deduction_entities')
-        .select('id, name')
+        .select('id, name, employer_id, is_self, employers:employer_id ( id, name )')
         .eq('status', 'active')
         .order('name', { ascending: true });
 
@@ -4838,16 +4856,43 @@
     if (!el) return;
 
     const current = el.value;
+    const options = STATE.deductionBatches.entitiesOptions || [];
+
+    /* الحزمة ج: تجميع الخيارات بـ <optgroup> حسب جهة العمل المالكة —
+       ينظم القائمة بعد تضاعفها (صف ذاتي لكل جهة عمل + الفروع) */
+    const NO_EMPLOYER = '— بدون جهة عمل —';
+    const groupsMap = new Map();
+    options.forEach((entity) => {
+      const employerName = joinName(entity.employers)
+        || (entity.employer_id ? ('جهة العمل #' + entity.employer_id) : NO_EMPLOYER);
+      if (!groupsMap.has(employerName)) groupsMap.set(employerName, []);
+      groupsMap.get(employerName).push(entity);
+    });
+
+    const groupNames = Array.from(groupsMap.keys()).sort((a, b) =>
+      String(a).localeCompare(String(b), 'ar')
+    );
+
+    const optionHtml = (entity) => {
+      /* الصف الذاتي داخل مجموعته: الترتيب أولًا + شارة نصية واضحة */
+      const selfBadge = entity.is_self === true ? ' (الجهة نفسها)' : '';
+      return '<option value="' + esc(entity.id) + '">'
+        + esc((entity.name || 'بدون اسم') + selfBadge)
+        + '</option>';
+    };
 
     el.innerHTML =
       '<option value="">— بدون (مطالبة نقدية) —</option>'
-      + (STATE.deductionBatches.entitiesOptions || [])
-        .map((entity) =>
-          '<option value="' + esc(entity.id) + '">'
-          + esc(entity.name || 'بدون اسم')
-          + '</option>'
-        )
-        .join('');
+      + groupNames.map((gName) => {
+          const list = groupsMap.get(gName).slice().sort((a, b) => {
+            /* الصف الذاتي أولًا ثم الفروع أبجديًا */
+            if (!!a.is_self !== !!b.is_self) return a.is_self ? -1 : 1;
+            return String(a.name || '').localeCompare(String(b.name || ''), 'ar');
+          });
+          return '<optgroup label="' + esc(gName) + '">'
+            + list.map(optionHtml).join('')
+            + '</optgroup>';
+        }).join('');
 
     if (current) el.value = current;
   }
@@ -5446,8 +5491,8 @@
     fetchMembersForBulk,
     checkExistingSubscriptions,
     checkExistingBatches,
-    groupMembersByEmployer,
-    resolveDeductionEntity,
+    /* الحزمة ج: التجميع حسب جهة الخصم (بديل groupMembersByEmployer/resolveDeductionEntity) */
+    groupMembersByDeductionEntity,
     generateBatchNumber,
     fetchMonthlyFeesByType,
     createBatchAndSubscriptions,
