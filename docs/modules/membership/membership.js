@@ -560,6 +560,8 @@
     optionsLoaded: false,
     types: [],
     employers: [],
+    /* الحزمة ب: ذاكرة جهات الخصم للـ Cascading */
+    deductionEntities: [],
     requestId: 0,
     searchTimer: null,
   };
@@ -567,9 +569,11 @@
   const MEMBERS_SELECT = [
     'id', 'member_number', 'full_name', 'phone', 'national_id', 'employee_number',
     'status', 'service_status', 'collection_method',
-    'membership_date', 'membership_type_id', 'employer_id',
+    'membership_date', 'membership_type_id', 'employer_id', 'deduction_entity_id',
     'membership_types:membership_type_id ( id, name )',
     'employers:employer_id ( id, name, scope )',
+    /* is_self مطلوب لعرض «تلقائي» في الجدول والتصدير (شرط القبول 5) */
+    'deduction_entities:deduction_entity_id ( id, name, is_self )',
   ].join(', ');
 
   const MEMBER_STATUS = {
@@ -764,7 +768,7 @@
     if (m.loading) {
       if (empty) empty.hidden = true;
       if (wrap)  wrap.hidden = false;
-      const widths = [70, 90, 60, 55, 70, 50, 60];
+      const widths = [70, 90, 60, 55, 70, 65, 50, 60];
       tbody.innerHTML = Array.from({ length: 6 }, () =>
         '<tr>' + widths
           .map((w) => '<td><div class="members-skeleton" style="width:' + w + '%"></div></td>')
@@ -791,6 +795,7 @@
     const status   = memberStatusOf(mem.status);
     const type     = joinName(mem.membership_types);
     const employer = joinName(mem.employers);
+    const deduction = mem.deduction_entities || null;
     const id       = Number(mem.id);
 
     const sub = [
@@ -813,6 +818,13 @@
       +   '</td>'
       +   '<td data-label="جهة العمل">'
       +     (employer ? esc(employer) : '<span class="member-muted">—</span>')
+      +   '</td>'
+      +   '<td data-label="جهة الخصم">'
+      +     (deduction
+              ? (deduction.is_self
+                  ? '<span class="member-badge-service">تلقائي</span>'
+                  : esc(deduction.name || '—'))
+              : '<span class="member-muted">—</span>')
       +   '</td>'
       +   '<td data-label="الحالة">'
       +     '<span class="member-badge ' + status.cls + '">' + esc(status.label) + '</span>'
@@ -1050,6 +1062,7 @@
     });
 
     bindMemberStatusListener();
+    bindMemberEmployerCascade(); /* الحزمة ب: cascading جهة الخصم */
     bindQuickEmployerModal();
     bindQuickEmployerTrigger();
   }
@@ -1101,19 +1114,39 @@
     if (!sb) return;
 
     try {
-      const [typesRes, employersRes] = await Promise.all([
+      const [typesRes, employersRes, entitiesRes] = await Promise.all([
         sb.from('membership_types').select('id, name').eq('status', 'active').order('sort_order', { ascending: true }),
-        sb.from('employers').select('id, name, scope').eq('status', 'active').order('name', { ascending: true }),
+        sb.from('employers').select('id, name, scope, has_deduction_entities').eq('status', 'active').order('name', { ascending: true }),
+        /* الحزمة ب: جهات الخصم للـ Cascading */
+        sb.from('deduction_entities').select('id, name, employer_id, is_self, status').order('name', { ascending: true }),
       ]);
 
-      if (!typesRes.error)     STATE.members.types     = typesRes.data || [];
-      if (!employersRes.error) STATE.members.employers = employersRes.data || [];
+      if (!typesRes.error) STATE.members.types = typesRes.data || [];
+      /* R13: الحاوية «جهات حكومية» لا تظهر في قوائم جهة عمل الأعضاء */
+      if (!employersRes.error) {
+        STATE.members.employers = (employersRes.data || []).filter((e) => !isContainerEmployer(e));
+      }
+      if (!entitiesRes.error) STATE.members.deductionEntities = entitiesRes.data || [];
       STATE.members.optionsLoaded = true;
 
       fillMembersSelect('filter-membership-type', STATE.members.types, 'كل الأنواع');
       fillMembersSelect('filter-employer',        STATE.members.employers, 'كل الجهات');
     } catch (e) {
       console.warn('[Baraka Membership] loadMembersOptions error:', e);
+    }
+  }
+
+  /* R13: الحاوية تُعرف بنفس منطق ensure_container_employer() في قاعدة البيانات */
+  const CONTAINER_EMPLOYER_NAME = 'جهات حكومية';
+  function isContainerEmployer(e) {
+    return !!e && e.name === CONTAINER_EMPLOYER_NAME;
+  }
+
+  /** الحزمة ب: إلغاء ذاكرة جهات الخصم المؤقتة — مماثلة لـ invalidateMembersOptions */
+  function invalidateDeductionEntitiesOptions() {
+    if (STATE.members) {
+      STATE.members.deductionEntities = [];
+      STATE.members.optionsLoaded = false;
     }
   }
 
@@ -1156,6 +1189,75 @@
         }
       }
       el.value = current;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════
+     الحزمة ب — Cascading: قائمة جهة الخصم التابعة لجهة العمل
+     employer_id = X AND is_self = false AND status = 'active'
+     ═══════════════════════════════════════════════════ */
+  function fillMemberDeductionEntitySelect(employerId, presetEntityId) {
+    const select   = document.getElementById('member-deduction-entity');
+    const hint     = document.getElementById('member-deduction-hint');
+    const required = document.getElementById('member-deduction-required');
+    if (!select) return;
+
+    const eid = employerId ? Number(employerId) : null;
+    const employer = eid
+      ? (STATE.members.employers || []).find((e) => Number(e.id) === eid)
+      : null;
+
+    /* الفروع التابعة: غير ذاتية ونشطة فقط */
+    const branches = eid
+      ? (STATE.members.deductionEntities || []).filter((d) =>
+          Number(d.employer_id) === eid && !d.is_self && d.status === 'active')
+      : [];
+
+    const hasBranches = !!(employer && employer.has_deduction_entities);
+    const showSelect  = !!(hasBranches && branches.length);
+
+    /* إعادة ضبط القيمة مع كل تغيير (شرط القبول 4) */
+    select.value = '';
+    select.classList.toggle('hidden', !showSelect);
+    select.hidden = !showSelect;
+    select.required = showSelect;
+    if (required) required.hidden = !showSelect;
+
+    if (!eid) {
+      if (hint) hint.textContent = 'اختر جهة العمل أولاً';
+      return;
+    }
+
+    if (!showSelect) {
+      if (hint) {
+        hint.textContent = hasBranches
+          ? 'تلقائي من جهة العمل (لا توجد فروع نشطة)'
+          : 'تلقائي من جهة العمل';
+      }
+      return;
+    }
+
+    /* لها فروع: القائمة إلزامية والتلميح يختفي */
+    if (hint) hint.textContent = '';
+
+    let optionsHtml = '<option value="">-- اختر جهة الخصم --</option>';
+
+    /* عضو محفوظ على الصف الذاتي لجهة عمل لها فروع ← خيار «تلقائي» صريح */
+    const preset = presetEntityId
+      ? (STATE.members.deductionEntities || []).find((d) => Number(d.id) === Number(presetEntityId))
+      : null;
+    if (preset && preset.is_self && Number(preset.employer_id) === eid) {
+      optionsHtml += '<option value="' + esc(preset.id) + '">تلقائي (صف ذاتي)</option>';
+    }
+
+    optionsHtml += branches.map((d) =>
+      '<option value="' + esc(d.id) + '">' + esc(d.name || '—') + '</option>'
+    ).join('');
+
+    select.innerHTML = optionsHtml;
+    if (presetEntityId) {
+      select.value = String(presetEntityId);
+      if (select.value !== String(presetEntityId)) select.value = '';
     }
   }
 
@@ -1202,6 +1304,8 @@
         fillMemberEmployerSelect(null);
       }
     }
+    /* الحزمة ب: Cascading — إعادة ضبط/تعبئة جهة الخصم بعد ملء جهة العمل */
+    fillMemberDeductionEntitySelect(employerSelect ? employerSelect.value : '');
     applyCollectionDefault(status);
   }
 
@@ -1211,6 +1315,16 @@
     statusEl.dataset.tripleBound = '1';
     statusEl.addEventListener('change', () => {
       toggleEmployerField();
+    });
+  }
+
+  /* الحزمة ب: تغيير جهة العمل ← إعادة ضبط حقل جهة الخصم تلقائيًا */
+  function bindMemberEmployerCascade() {
+    const el = document.getElementById('member-employer');
+    if (!el || el.dataset.deductionCascadeBound === '1') return;
+    el.dataset.deductionCascadeBound = '1';
+    el.addEventListener('change', () => {
+      fillMemberDeductionEntitySelect(el.value);
     });
   }
 
@@ -1270,6 +1384,8 @@
       fillMemberEmployerSelect(curScope);
       if (data && data.id) {
         setVal('member-employer', data.id);
+        /* الحزمة ب: جهة العمل الجديدة بلا فروع ← تلميح «تلقائي من جهة العمل» */
+        fillMemberDeductionEntitySelect(data.id);
       }
       closeQuickEmployerModal();
       if (typeof toast === 'function') toast('تمت إضافة جهة العمل بنجاح', 'success');
@@ -1389,10 +1505,16 @@
 
     toggleEmployerField();
     setVal('member-employer', data && data.employer_id ? data.employer_id : '');
+    /* الحزمة ب: Cascading — تعبئة جهة الخصم حسب جهة العمل + استعادة القيمة المحفوظة */
+    fillMemberDeductionEntitySelect(
+      data && data.employer_id ? data.employer_id : '',
+      data && data.deduction_entity_id ? data.deduction_entity_id : null
+    );
     // تأكيد الربط عند كل فتح للنافذة
     try { bindQuickEmployerTrigger(); } catch (e) {}
     try { bindQuickEmployerModal(); } catch (e) {}
     try { bindMemberStatusListener(); } catch (e) {}
+    try { bindMemberEmployerCascade(); } catch (e) {}
 
     document.getElementById('member-modal-title').textContent = MEMBER_EDIT.readOnly
       ? 'بيانات العضو'
@@ -1468,6 +1590,23 @@
       membership_date:    val('member-date') || null,
     };
 
+    /* ── الحزمة ب: جهة الخصم ── */
+    const deductionSelect   = document.getElementById('member-deduction-entity');
+    const deductionVisible  = !!(deductionSelect && !deductionSelect.classList.contains('hidden'));
+    const deductionEntityRaw = val('member-deduction-entity');
+
+    /* جهة عمل لها فروع ← اختيار جهة الخصم إلزامي */
+    if (deductionVisible && !deductionEntityRaw) {
+      fail('يجب اختيار جهة الخصم التابعة لجهة العمل.');
+      return;
+    }
+
+    /* لا تُرسل deduction_entity_id إذا كان الحقل مخفياً — يملأ المشغّل
+       (members_link_deduction_entity_trigger) الصف الذاتي تلقائيًا (R3) */
+    if (deductionVisible && deductionEntityRaw && payload.employer_id) {
+      payload.deduction_entity_id = Number(deductionEntityRaw);
+    }
+
     const memberNumber = val('member-number-input');
     if (memberNumber) payload.member_number = memberNumber;
 
@@ -1490,7 +1629,10 @@
       console.error('[Baraka Membership] saveMemberForm error:', e);
       const msg = (e && e.code === '23505')
         ? 'الرقم القومي أو رقم العضوية مستخدم مسبقًا.'
-        : 'تعذَّر حفظ بيانات العضو — تحقَّق من المدخلات.';
+        : (e && e.code === '23514')
+          /* الحزمة ب: تكامل مرجعي من members_link_deduction_entity_trigger */
+          ? 'جهة الخصم المختارة غير متوافقة مع جهة العمل'
+          : 'تعذَّر حفظ بيانات العضو — تحقَّق من المدخلات.';
       fail(msg);
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'حفظ'; }
@@ -1521,6 +1663,9 @@
         'الرقم الوظيفي':     m.employee_number || '',
         'نوع العضوية':       joinName(m.membership_types),
         'جهة العمل':         joinName(m.employers),
+        'جهة الخصم':         m.deduction_entities
+          ? (m.deduction_entities.is_self ? 'تلقائي' : (m.deduction_entities.name || ''))
+          : '',
         'الحالة بالخدمة':    MEMBER_SERVICE_STATUS[m.service_status] || '',
         'حالة العضوية':      memberStatusOf(m.status).label,
         'تاريخ العضوية':     m.membership_date || '',
@@ -1529,7 +1674,7 @@
       const ws = XLSX.utils.json_to_sheet(rows);
       ws['!cols'] = [
         { wch: 5 }, { wch: 14 }, { wch: 30 }, { wch: 16 }, { wch: 14 },
-        { wch: 14 }, { wch: 14 }, { wch: 24 }, { wch: 14 }, { wch: 12 }, { wch: 14 },
+        { wch: 14 }, { wch: 14 }, { wch: 24 }, { wch: 16 }, { wch: 14 }, { wch: 12 }, { wch: 14 },
       ];
       ws['!freeze'] = { xSplit: 0, ySplit: 1 };
 
@@ -1555,6 +1700,7 @@
     member_number:    ['رقم العضوية', 'رقم العضو', 'membernumber', 'member_number'],
     membership_type:  ['نوع العضوية', 'الفئة', 'فئة العضوية', 'membershiptype'],
     employer:         ['جهة العمل', 'العمل', 'الجهة', 'employer'],
+    deduction_entity: ['جهة الخصم', 'الخصم', 'deductionentity', 'deduction_entity'],
     service_status:   ['الحالة بالخدمة', 'الحالة الوظيفية', 'servicestatus'],
     status:           ['الحالة', 'حالة العضوية', 'status'],
     membership_date:  ['تاريخ العضوية', 'تاريخ الانتساب', 'membershipdate'],
@@ -1608,6 +1754,9 @@
       STATE.members.types.forEach((t) => { typeByName[normalizeHeader(t.name)] = t.id; });
       const employerByName = {};
       STATE.members.employers.forEach((x) => { employerByName[normalizeHeader(x.name)] = x.id; });
+      /* الحزمة ب: بحث جهة الخصم بالاسم */
+      const entityByName = {};
+      (STATE.members.deductionEntities || []).forEach((d) => { entityByName[normalizeHeader(d.name)] = d.id; });
 
       const seenNational = {};
       const payloads = [];
@@ -1630,6 +1779,11 @@
         let employerId = employerName ? (employerByName[employerName] || null) : null;
         if (employerName && !employerId) unknownEmployers++;
 
+        /* الحزمة ب: جهة الخصم بالاسم — تُقبل إن تبع جهة العمل،
+           وإلا يرفضها مشغّل التكامل (23514) عند الإدراج */
+        const entityNameRaw = normalizeHeader(get('deduction_entity'));
+        const deductionEntityId = entityNameRaw ? (entityByName[entityNameRaw] || null) : null;
+
         const rawStatus = normalizeHeader(get('status'));
         const status = rawStatus.indexOf('موقوف') !== -1 ? 'suspended'
           : rawStatus.indexOf('مخفي') !== -1 ? 'hidden'
@@ -1648,6 +1802,8 @@
           member_number:      get('member_number') || null,
           membership_type_id: typeName ? (typeByName[typeName] || null) : null,
           employer_id:        employerId,
+          /* الحزمة ب */
+          deduction_entity_id: deductionEntityId,
           service_status:     serviceStatus,
           status:             status,
           membership_date:    get('membership_date') || null,
@@ -1725,8 +1881,40 @@
     return DIR_STATUS[status] || { label: status || '—', cls: 'member-badge-hidden' };
   }
 
+  /* ذاكرة مؤقتة لقائمة جهات العمل — تُستخدم في حقل «جهة العمل المالكة»
+     بنافذة جهة الخصم، وتُلغى مع أي تغيير على جهات العمل */
+  let entityEmployerOptionsCache = null;
+
   function invalidateMembersOptions() {
     if (STATE.members) STATE.members.optionsLoaded = false;
+    entityEmployerOptionsCache = null;
+  }
+
+  /** تعبئة قائمة «جهة العمل المالكة» في نافذة جهة الخصم (مشروطة بوجود الحقل) */
+  async function fillEmployerSelect(selectId, selectedId) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+
+    if (!entityEmployerOptionsCache) {
+      const sb = membersSb();
+      if (!sb) return;
+      const { data, error } = await sb
+        .from('employers')
+        .select('id, name')
+        .order('name', { ascending: true })
+        .limit(1000);
+      if (error) throw error;
+      entityEmployerOptionsCache = data || [];
+    }
+
+    const current = (selectedId === null || selectedId === undefined) ? '' : String(selectedId);
+    sel.innerHTML = '<option value="">— اختر جهة العمل المالكة —</option>'
+      + entityEmployerOptionsCache.map((e) =>
+          '<option value="' + esc(e.id) + '">' + esc(e.name || '—') + '</option>'
+        ).join('');
+    sel.value = current;
+    /* إن كانت الجهة المالكة غير موجودة في القائمة أعد الحالة لل placeholder */
+    if (current && sel.value !== current) sel.value = '';
   }
 
   function loadEmployers()          { return EmployersTab.load(); }
@@ -1744,6 +1932,17 @@
       return el ? String(el.value || '').trim() : '';
     };
 
+    /* ── Checkboxes: تُدار عبر .checked وليس value (مشروطة بـ config) ── */
+    const isChecked = (id) => {
+      const el = $(id);
+      return Boolean(el && el.checked);
+    };
+
+    const setChecked = (id, on) => {
+      const el = $(id);
+      if (el) el.checked = Boolean(on);
+    };
+
     const fieldBindings = [
       { id: config.ids.nameInput,  key: 'name' },
       { id: config.inputs.code,    key: 'code' },
@@ -1752,6 +1951,8 @@
       { id: config.inputs.contact, key: 'contact_person' },
       { id: config.inputs.email,   key: 'email' },
       { id: config.inputs.scope,   key: 'scope' },
+      /* الحزمة أ: Checkbox — يُفعَّل فقط عند تعريفه في config.inputs */
+      { id: config.inputs.hasDeductionEntities, key: 'has_deduction_entities', type: 'checkbox' },
     ].filter((f) => f.id);
 
     function hasFilters() {
@@ -1778,7 +1979,7 @@
       try {
         const { data, error } = await sb
           .from(config.table)
-          .select('*')
+          .select(config.select || '*')
           .order('name', { ascending: true })
           .limit(1000);
 
@@ -1924,7 +2125,7 @@
       renderAll();
     }
 
-    function openModal(id) {
+    async function openModal(id) {
       const modal = $(config.ids.modal);
       if (!modal) return;
 
@@ -1935,10 +2136,31 @@
       st.editId = data ? Number(data.id) : null;
 
       setVal(config.ids.idInput, data ? data.id : '');
-      fieldBindings.forEach((f) => setVal(f.id, data ? (data[f.key] || '') : ''));
+      fieldBindings.forEach((f) => {
+        if (f.type === 'checkbox') setChecked(f.id, data ? Boolean(data[f.key]) : false);
+        else setVal(f.id, data ? (data[f.key] || '') : '');
+      });
       setVal(config.ids.statusSelect, data ? data.status || 'active' : 'active');
       if (config.hasScope && config.inputs.scope) {
         setVal(config.inputs.scope, data ? (data.scope || 'internal') : 'internal');
+      }
+
+      /* الحزمة أ: الأزرار المقصورة على وضع التعديل (مشروطة بـ config) */
+      if (Array.isArray(config.editOnlyBtns)) {
+        config.editOnlyBtns.forEach((btnId) => {
+          const btnEl = $(btnId);
+          if (btnEl) btnEl.hidden = !st.editId;
+        });
+      }
+
+      /* الحزمة أ: تعبئة «جهة العمل المالكة» (نافذة جهة الخصم — مشروطة بـ config) */
+      if (config.employerSelect) {
+        try {
+          await fillEmployerSelect(config.employerSelect, data ? data.employer_id : null);
+        } catch (e) {
+          console.error('[Baraka Membership] ' + config.logTag + ' fillEmployerSelect error:', e);
+          if (typeof toast === 'function') toast('تعذَّر تحميل قائمة جهات العمل', 'error');
+        }
       }
 
       const titleEl = $(config.ids.modalTitle);
@@ -1989,6 +2211,22 @@
       if (config.inputs.email) payload.email = email;
       if (config.hasScope && config.inputs.scope) {
         payload.scope = val(config.inputs.scope) || 'internal';
+      }
+
+      /* الحزمة أ: Checkboxes (مشروطة بـ config) — تُقرأ من .checked لا من value */
+      fieldBindings.forEach((f) => {
+        if (f.type === 'checkbox') payload[f.key] = isChecked(f.id);
+      });
+
+      /* الحزمة أ: جهة العمل المالكة (نافذة جهة الخصم فقط) — مطلوبة
+         لمنع إنشاء جهات خصم يتيمة تذهب للحاوية صامتاً */
+      if (config.employerSelect) {
+        const ownerId = val(config.employerSelect);
+        if (!ownerId) {
+          fail(config.labels.employerRequired || 'اختر جهة العمل المالكة للجهة الخصم.');
+          return;
+        }
+        payload.employer_id = Number(ownerId);
       }
 
       const btn = $(config.ids.saveBtn);
@@ -2124,6 +2362,17 @@
         const saveBtn = $(config.ids.saveBtn);
         if (saveBtn) saveBtn.addEventListener('click', save);
 
+        /* الحزمة أ: زر «إدارة جهات الاستحقاق التابعة» (مشروط بـ config) —
+           يفتح النافذة الفرعية ويمرر لها جهة العمل الحالية */
+        if (config.subEntitiesBtn) {
+          const subBtn = $(config.subEntitiesBtn);
+          if (subBtn) subBtn.addEventListener('click', () => {
+            const employerId = val(config.ids.idInput);
+            if (!employerId) return; /* لا قيمة = وضع الإضافة، والزر مخفي أصلاً */
+            openSubEntitiesModal(Number(employerId), val(config.ids.nameInput));
+          });
+        }
+
         document.addEventListener('keydown', (e) => {
           if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
         });
@@ -2207,7 +2456,12 @@
       contact: 'employer-contact',
       email:   null,
       scope:   'employer-scope',
+      /* الحزمة أ: Checkbox «لها جهات استحقاق فرعية» — has_deduction_entities */
+      hasDeductionEntities: 'employer-has-entities',
     },
+    /* الحزمة أ: زر إدارة الفروع — يظهر في وضع التعديل فقط */
+    subEntitiesBtn: 'btn-manage-sub-entities',
+    editOnlyBtns: ['btn-manage-sub-entities'],
     labels: {
       one:           'جهة العمل',
       addTitle:      'إضافة جهة عمل',
@@ -2238,16 +2492,319 @@
   function deleteEmployer(id)       { return EmployersTab.remove(id); }
   function bindEmployers()          { return EmployersTab.bind(); }
 
+  /* ═══════════════════════════════════════════════════
+     الحزمة أ — نافذة إدارة جهات الاستحقاق التابعة (الفروع)
+     استعلام: deduction_entities حيث employer_id = الجهة
+     المحددة و is_self = false — والحفظ/الحذف مقيدان بـ employer_id
+     ═══════════════════════════════════════════════════ */
+  const SUB_ENTITIES = {
+    employerId:   null,
+    employerName: '',
+    editId:       null,
+    rows:         [],
+    requestId:    0,
+  };
+
+  function subEntitiesVal(id) {
+    const el = document.getElementById(id);
+    return el ? String(el.value || '').trim() : '';
+  }
+
+  function openSubEntitiesModal(employerId, employerName) {
+    const modal = document.getElementById('sub-entities-modal');
+    if (!modal) return;
+
+    const id = Number(employerId);
+    if (!id) {
+      if (typeof toast === 'function') toast('حدّد جهة العمل أولًا (وضع التعديل) لإدارة فروعها', 'error');
+      return;
+    }
+
+    SUB_ENTITIES.employerId   = id;
+    SUB_ENTITIES.employerName = employerName || '';
+    SUB_ENTITIES.editId       = null;
+
+    const titleEl = document.getElementById('sub-entities-modal-title');
+    if (titleEl) {
+      titleEl.textContent = 'جهات الاستحقاق التابعة لـ: ' + (SUB_ENTITIES.employerName || ('#' + id));
+    }
+
+    resetSubEntityForm();
+    modal.classList.remove('hidden');
+    loadSubEntities(id);
+  }
+
+  function closeSubEntitiesModal() {
+    const modal = document.getElementById('sub-entities-modal');
+    if (modal) modal.classList.add('hidden');
+    SUB_ENTITIES.editId = null;
+  }
+
+  async function loadSubEntities(employerId) {
+    const eid = Number(employerId || SUB_ENTITIES.employerId);
+    if (!eid) return;
+
+    const tbody = document.getElementById('sub-entities-tbody');
+    if (!tbody) return;
+
+    const sb = membersSb();
+    if (!sb) {
+      if (typeof toast === 'function') toast('لا يوجد اتصال بقاعدة البيانات', 'error');
+      return;
+    }
+
+    const requestId = ++SUB_ENTITIES.requestId;
+    tbody.innerHTML = '<tr><td colspan="4"><div class="members-skeleton" style="width:60%"></div></td></tr>';
+
+    try {
+      const { data, error } = await sb
+        .from('deduction_entities')
+        .select('id, name, code, status, is_self, employer_id')
+        .eq('employer_id', eid)
+        .eq('is_self', false)
+        .order('name', { ascending: true });
+
+      if (requestId !== SUB_ENTITIES.requestId) return; /* استعلام قديم — تجاهله */
+      if (error) throw error;
+
+      SUB_ENTITIES.rows = data || [];
+      renderSubEntitiesRows();
+    } catch (e) {
+      if (requestId !== SUB_ENTITIES.requestId) return;
+      console.error('[Baraka Membership] SubEntities load error:', e);
+      SUB_ENTITIES.rows = [];
+      renderSubEntitiesRows();
+      if (typeof toast === 'function') toast('تعذَّر تحميل جهات الاستحقاق التابعة', 'error');
+    }
+  }
+
+  function renderSubEntitiesRows() {
+    const tbody = document.getElementById('sub-entities-tbody');
+    if (!tbody) return;
+
+    const rows = SUB_ENTITIES.rows;
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">'
+        + '<span class="member-muted">لا توجد جهات استحقاق تابعة بعد — اضغط «إضافة فرع جديد».</span>'
+        + '</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map((r) => {
+      const status = dirStatusOf(r.status);
+      const id = Number(r.id);
+      return ''
+        + '<tr>'
+        +   '<td data-label="الاسم"><span class="member-name">' + esc(r.name || '—') + '</span></td>'
+        +   '<td data-label="الرمز">'
+        +     (r.code ? '<span class="member-number">' + esc(r.code) + '</span>' : '<span class="member-muted">—</span>')
+        +   '</td>'
+        +   '<td data-label="الحالة"><span class="member-badge ' + status.cls + '">' + esc(status.label) + '</span></td>'
+        +   '<td data-label="إجراءات">'
+        +     '<div class="member-actions">'
+        +       '<button type="button" class="member-action" data-sub-entity-action="edit" data-sub-entity-id="' + id + '" title="تعديل" aria-label="تعديل">✏️</button>'
+        +       '<button type="button" class="member-action" data-sub-entity-action="delete" data-sub-entity-id="' + id + '" title="حذف" aria-label="حذف">🗑</button>'
+        +     '</div>'
+        +   '</td>'
+        + '</tr>';
+    }).join('');
+  }
+
+  function resetSubEntityForm() {
+    SUB_ENTITIES.editId = null;
+    setVal('sub-entity-id', '');
+    setVal('sub-entity-name', '');
+    setVal('sub-entity-code', '');
+    setVal('sub-entity-status', 'active');
+
+    const errEl = document.getElementById('sub-entity-form-error');
+    if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
+
+    const cancelBtn = document.getElementById('btn-cancel-sub-entity');
+    if (cancelBtn) cancelBtn.hidden = true;
+
+    const addBtn = document.getElementById('btn-add-sub-entity');
+    if (addBtn) addBtn.hidden = false;
+  }
+
+  function startSubEntityEdit(row) {
+    if (!row) return;
+
+    SUB_ENTITIES.editId = Number(row.id);
+    setVal('sub-entity-id', row.id);
+    setVal('sub-entity-name', row.name || '');
+    setVal('sub-entity-code', row.code || '');
+    setVal('sub-entity-status', row.status || 'active');
+
+    const errEl = document.getElementById('sub-entity-form-error');
+    if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
+
+    const cancelBtn = document.getElementById('btn-cancel-sub-entity');
+    if (cancelBtn) cancelBtn.hidden = false;
+
+    const addBtn = document.getElementById('btn-add-sub-entity');
+    if (addBtn) addBtn.hidden = true;
+
+    const nameEl = document.getElementById('sub-entity-name');
+    if (nameEl) nameEl.focus();
+  }
+
+  async function saveSubEntity() {
+    const sb = membersSb();
+    const errEl = document.getElementById('sub-entity-form-error');
+    const fail = (msg) => {
+      if (errEl) { errEl.textContent = msg; errEl.hidden = false; }
+      if (typeof toast === 'function') toast(msg, 'error');
+    };
+
+    if (!sb) { fail('لا يوجد اتصال بقاعدة البيانات'); return; }
+
+    const employerId = Number(SUB_ENTITIES.employerId);
+    if (!employerId) { fail('أعد فتح النافذة — جهة العمل غير محددة.'); return; }
+
+    const name = subEntitiesVal('sub-entity-name');
+    if (!name) { fail('اسم فرع الاستحقاق حقل مطلوب.'); return; }
+
+    const payload = {
+      name:        name,
+      code:        subEntitiesVal('sub-entity-code') || null,
+      status:      subEntitiesVal('sub-entity-status') || 'active',
+      employer_id: employerId, /* مقيد دائمًا بجهة العمل الحالية */
+      is_self:     false,      /* الفروع ليست صفوفًا ذاتية */
+    };
+
+    const saveBtn = document.getElementById('btn-save-sub-entity');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'جارٍ الحفظ…'; }
+
+    try {
+      const query = SUB_ENTITIES.editId
+        ? sb.from('deduction_entities').update(payload)
+            .eq('id', SUB_ENTITIES.editId)
+            .eq('employer_id', employerId) /* الحفظ مقيد بـ employer_id */
+            .eq('is_self', false)
+        : sb.from('deduction_entities').insert(payload);
+
+      const { error } = await query;
+      if (error) throw error;
+
+      const isEdit = !!SUB_ENTITIES.editId;
+      if (typeof toast === 'function') toast(isEdit ? 'تم حفظ فرع الاستحقاق' : 'تمت إضافة فرع الاستحقاق', 'success');
+      resetSubEntityForm();
+      invalidateMembersOptions();
+      loadSubEntities(employerId);
+      EntitiesTab.load(); /* تحديث جدول جهات الخصم العام */
+    } catch (e) {
+      console.error('[Baraka Membership] SubEntities save error:', e);
+      const msg = (e && e.code === '23505')
+        ? 'اسم الفرع أو الرمز مستخدم داخل هذه الجهة.'
+        : 'تعذَّر حفظ فرع الاستحقاق — تحقَّق من المدخلات.';
+      fail(msg);
+    } finally {
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'حفظ الفرع'; }
+    }
+  }
+
+  async function deleteSubEntity(id) {
+    const employerId = Number(SUB_ENTITIES.employerId);
+    if (!employerId) return;
+
+    const row = SUB_ENTITIES.rows.find((r) => Number(r.id) === Number(id));
+    if (!row) return;
+
+    if (!window.confirm('سيتم حذف «' + (row.name || 'الفرع') + '» من جهات الاستحقاق التابعة.\nسيعود أعضاؤها إلى صف الجهة الذاتي.\nهل أنت متأكد من المتابعة؟')) return;
+
+    const sb = membersSb();
+    if (!sb) { if (typeof toast === 'function') toast('لا يوجد اتصال بقاعدة البيانات', 'error'); return; }
+
+    try {
+      const { error } = await sb
+        .from('deduction_entities')
+        .delete()
+        .eq('id', row.id)
+        .eq('employer_id', employerId) /* الحذف مقيد بـ employer_id */
+        .eq('is_self', false);         /* لا يُحذف الصف الذاتي من هنا */
+      if (error) throw error;
+
+      if (typeof toast === 'function') toast('تم حذف فرع الاستحقاق', 'success');
+      loadSubEntities(employerId);
+      EntitiesTab.load(); /* تحديث جدول جهات الخصم العام */
+    } catch (e) {
+      console.error('[Baraka Membership] SubEntities delete error:', e);
+      const msg = (e && e.code === '23503')
+        ? 'لا يمكن حذف الفرع — أنه مرتبط بسجلات أخرى (دفعات/أعضاء).'
+        : 'تعذَّر حذف فرع الاستحقاق — قد يكون مرتبطًا بسجلات أخرى.';
+      if (typeof toast === 'function') toast(msg, 'error');
+    }
+  }
+
+  function bindSubEntitiesModal() {
+    const modal = document.getElementById('sub-entities-modal');
+    if (!modal || modal.dataset.subBound === '1') return;
+    modal.dataset.subBound = '1';
+
+    /* الإغلاق عبر الأزرار الحاملة لـ data-close-sub-entities-modal */
+    modal.addEventListener('click', (e) => {
+      if (e.target.closest('[data-close-sub-entities-modal]')) closeSubEntitiesModal();
+    });
+
+    /* إضافة فرع جديد / حفظ / إلغاء التعديل */
+    const addBtn = document.getElementById('btn-add-sub-entity');
+    if (addBtn) addBtn.addEventListener('click', () => {
+      resetSubEntityForm();
+      const nameEl = document.getElementById('sub-entity-name');
+      if (nameEl) nameEl.focus();
+    });
+
+    const saveBtn = document.getElementById('btn-save-sub-entity');
+    if (saveBtn) saveBtn.addEventListener('click', saveSubEntity);
+
+    const cancelBtn = document.getElementById('btn-cancel-sub-entity');
+    if (cancelBtn) cancelBtn.addEventListener('click', resetSubEntityForm);
+
+    const form = document.getElementById('sub-entity-form');
+    if (form) form.addEventListener('submit', (e) => { e.preventDefault(); saveSubEntity(); });
+
+    /* تعديل / حذف لكل صف */
+    const tbody = document.getElementById('sub-entities-tbody');
+    if (tbody) tbody.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-sub-entity-action]');
+      if (!btn) return;
+      const action = btn.getAttribute('data-sub-entity-action');
+      const id = Number(btn.getAttribute('data-sub-entity-id'));
+      if (action === 'edit') {
+        startSubEntityEdit(SUB_ENTITIES.rows.find((r) => Number(r.id) === id));
+      }
+      if (action === 'delete') deleteSubEntity(id);
+    });
+
+    /* Escape يغلق النافذة الفرعية فقط (capture حتى لا يُغلق معاها
+       نافذة جهة العمل المفتوحة خلفها) */
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (modal.classList.contains('hidden')) return;
+      e.stopImmediatePropagation();
+      closeSubEntitiesModal();
+    }, true);
+  }
+
   /* ── صفوف جدول جهات الخصم ── */
   function entityRowHtml(row) {
     const status = dirStatusOf(row.status);
     const id = Number(row.id);
+    /* الحزمة أ: جهة العمل المالكة عبر العلاقة المضمّنة (employers) */
+    const ownerName = joinName(row.employers);
 
     return ''
       + '<tr data-entity-row="' + id + '">'
       +   '<td data-label="الاسم">'
       +     '<span class="member-name">' + esc(row.name || '—') + '</span>'
       +     (row.address ? '<span class="member-sub">' + esc(row.address) + '</span>' : '')
+      +   '</td>'
+      +   '<td data-label="جهة العمل المالكة">'
+      +     (ownerName
+              ? '<span>' + esc(ownerName) + '</span>'
+              : '<span class="member-muted">—</span>')
+      +     (row.is_self ? ' <span class="member-badge member-badge-self">(الجهة نفسها)</span>' : '')
       +   '</td>'
       +   '<td data-label="الرمز">'
       +     (row.code ? '<span class="member-number">' + esc(row.code) + '</span>' : '<span class="member-muted">—</span>')
@@ -2277,7 +2834,11 @@
     table: 'deduction_entities',
     sectionId: 'tab-deduction-entities',
     logTag: 'DeductionEntities',
-    cols: 7,
+    cols: 8,
+    /* الحزمة أ: علاقة مضمّنة لجلب اسم جهة العمل المالكة مع كل صف */
+    select: '*, employers:employer_id (id, name)',
+    /* الحزمة أ: حقل اختيار جهة العمل المالكة في النافذة */
+    employerSelect: 'entity-employer',
     state: STATE.deductionEntities,
     actionAttr: 'data-entity-action',
     idAttr: 'data-entity-id',
@@ -2315,6 +2876,7 @@
       addTitle:      'إضافة جهة خصم',
       editTitle:     'تعديل جهة الخصم',
       nameRequired:  'اسم جهة الخصم حقل مطلوب.',
+      employerRequired: 'اختر جهة العمل المالكة للجهة الخصم.',
       duplicate:     'اسم جهة الخصم أو الرمز مستخدم مسبقًا.',
       saveError:     'تعذَّر حفظ بيانات جهة الخصم — تحقَّق من المدخلات.',
       savedAdd:      'تمت إضافة جهة الخصم بنجاح',
@@ -4799,6 +5361,8 @@
   try { bindMemberStatusListener(); } catch (e) { console.warn('[Baraka] bindMemberStatusListener error', e); }
   try { bindQuickEmployerModal(); } catch (e) { console.warn('[Baraka] bindQuickEmployerModal error', e); }
   try { bindQuickEmployerTrigger(); } catch (e) { console.warn('[Baraka] bindQuickEmployerTrigger error', e); }
+  /* الحزمة أ: ربط نافذة جهات الاستحقاق التابعة */
+  try { bindSubEntitiesModal(); } catch (e) { console.warn('[Baraka] bindSubEntitiesModal error', e); }
   // ربط نافذة bulk-batch-modal أيضًا
   try {
     const bulkModal = document.getElementById('bulk-batch-modal');
@@ -4840,6 +5404,9 @@
     closeMemberModal,
     exportMembersExcel,
     importMembersExcel,
+    /* الحزمة ب: Cascading قائمة جهة الخصم */
+    invalidateDeductionEntitiesOptions,
+    fillMemberDeductionEntitySelect,
 
     /* ─ تبويب الاشتراكات ─ */
     loadSubscriptions,
@@ -4896,6 +5463,11 @@
     saveEmployer,
     deleteEmployer,
     bindEmployers,
+
+    /* ─ الحزمة أ: نافذة جهات الاستحقاق التابعة ─ */
+    openSubEntitiesModal,
+    closeSubEntitiesModal,
+    loadSubEntities,
 
     /* ─ تبويب جهات الخصم ─ */
     loadDeductionEntities,

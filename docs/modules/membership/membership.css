@@ -1297,6 +1297,13 @@
   white-space: nowrap;
 }
 
+/* الحزمة أ: شارة «(الجهة نفسها)» الرمادية للصفوف الذاتية في جدول جهات الخصم */
+.member-badge-self {
+  background-color: var(--bg-muted);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
 /* ═══════════════════════════════════════════════════
    أزرار الإجراءات (.member-actions)
    ═══════════════════════════════════════════════════ */

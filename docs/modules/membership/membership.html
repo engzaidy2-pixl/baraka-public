@@ -343,6 +343,7 @@
                   <th scope="col">الجوال</th>
                   <th scope="col">نوع العضوية</th>
                   <th scope="col">جهة العمل</th>
+                  <th scope="col">جهة الخصم</th>
                   <th scope="col">الحالة</th>
                   <th scope="col" class="members-th-actions">إجراءات</th>
                 </tr>
@@ -423,6 +424,18 @@
                         </button>
                       </div>
                       <small id="member-employer-hint" class="field-hint"></small>
+                    </div>
+
+                    <!-- الحزمة ب: جهة الخصم — Cascading مع جهة العمل -->
+                    <div class="member-field" id="member-deduction-entity-field">
+                      <label class="membership-label" for="member-deduction-entity">
+                        جهة الخصم
+                        <span id="member-deduction-required" class="field-required" hidden>*</span>
+                      </label>
+                      <select id="member-deduction-entity" class="membership-input hidden" hidden>
+                        <option value="">-- اختر جهة الخصم --</option>
+                      </select>
+                      <small id="member-deduction-hint" class="field-hint">اختر جهة العمل أولاً</small>
                     </div>
 
                     <div class="member-field">
@@ -611,6 +624,17 @@
               </small>
             </div>
 
+            <!-- الحزمة أ: مفتاح جهات الاستحقاق الفرعية (has_deduction_entities) -->
+            <div class="member-field member-field-full">
+              <label class="flex items-center gap-2" for="employer-has-entities">
+                <input type="checkbox" id="employer-has-entities">
+                <span class="text-sm font-bold">لها جهات استحقاق فرعية</span>
+              </label>
+              <small class="membership-hint">
+                فعّلها إذا كانت الجهة لديها إدارات استحقاق/فروع تابعة، ثم اضغط «إدارة جهات الاستحقاق التابعة» لإضافتها.
+              </small>
+            </div>
+
             <div class="member-field member-field-full">
               <label class="membership-label" for="employer-status">الحالة</label>
               <select id="employer-status" class="membership-input">
@@ -626,6 +650,8 @@
 
       <div class="membership-modal-footer">
         <button type="button" class="membership-btn membership-btn-outline" data-close-employer-modal>إلغاء</button>
+        <!-- الحزمة أ: زر ثالث — يظهر في وضع التعديل فقط (عند وجود employer-id) -->
+        <button type="button" class="membership-btn membership-btn-outline" id="btn-manage-sub-entities" hidden>إدارة جهات الاستحقاق التابعة</button>
         <button type="button" class="membership-btn membership-btn-accent" id="btn-save-employer">حفظ</button>
       </div>
     </div>
@@ -722,6 +748,7 @@
       <thead>
         <tr>
           <th scope="col">الاسم</th>
+          <th scope="col">جهة العمل المالكة</th>
           <th scope="col">الرمز</th>
           <th scope="col">المسؤول</th>
           <th scope="col">الهاتف</th>
@@ -762,6 +789,17 @@
             <div class="member-field member-field-full">
               <label class="membership-label" for="entity-name">الاسم <span class="required">*</span></label>
               <input type="text" id="entity-name" class="membership-input" autocomplete="off">
+            </div>
+
+            <!-- الحزمة أ: جهة العمل المالكة — لمنع الجهات الخصم اليتيمة -->
+            <div class="member-field member-field-full">
+              <label class="membership-label" for="entity-employer">جهة العمل المالكة <span class="required">*</span></label>
+              <select id="entity-employer" class="membership-input">
+                <option value="">— اختر جهة العمل المالكة —</option>
+              </select>
+              <small class="membership-hint">
+                الجهة التي تنتمي إليها جهة الخصم (علاقة 1:N). الحقل مطلوب حتى لا تُنشأ جهات خصم يتيمة تذهب للحاوية صامتاً.
+              </small>
             </div>
 
             <div class="member-field">
@@ -810,6 +848,74 @@
   </div>
 
 </section>
+
+<!-- ═══ الحزمة أ: نافذة إدارة جهات الاستحقاق التابعة لجهة العمل ═══
+     ملاحظة: وُضعت خارج كتل .tab-panel (بعد السطر 810 مباشرة / بعد إغلاق
+     القسم) حتى تظل مرئية عند فتحها من نافذة جهة العمل في تبويب جهات العمل. -->
+<div id="sub-entities-modal" class="membership-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="sub-entities-modal-title">
+  <div class="membership-modal" style="max-width: 44rem;">
+    <div class="membership-modal-header">
+      <h3 class="membership-modal-title" id="sub-entities-modal-title">جهات الاستحقاق التابعة</h3>
+      <button type="button" class="membership-btn membership-btn-outline membership-btn-sm" data-close-sub-entities-modal aria-label="إغلاق">✕</button>
+    </div>
+
+    <div class="membership-modal-body">
+      <!-- نموذج إضافة/تعديل فرع -->
+      <form id="sub-entity-form" class="member-form" novalidate>
+        <input type="hidden" id="sub-entity-id">
+
+        <div class="member-form-grid">
+          <div class="member-field member-field-full">
+            <label class="membership-label" for="sub-entity-name">اسم فرع الاستحقاق <span class="required">*</span></label>
+            <input type="text" id="sub-entity-name" class="membership-input" placeholder="مثال: إدارة استحقاقات وزارة التربية" autocomplete="off">
+          </div>
+
+          <div class="member-field">
+            <label class="membership-label" for="sub-entity-code">الرمز</label>
+            <input type="text" id="sub-entity-code" class="membership-input" placeholder="مثال: EDU-ACC" autocomplete="off">
+          </div>
+
+          <div class="member-field">
+            <label class="membership-label" for="sub-entity-status">الحالة</label>
+            <select id="sub-entity-status" class="membership-input">
+              <option value="active">نشط</option>
+              <option value="inactive">غير نشط</option>
+            </select>
+          </div>
+        </div>
+
+        <p class="member-form-error" id="sub-entity-form-error" hidden></p>
+      </form>
+
+      <div class="members-toolbar-actions" style="margin-top:.75rem">
+        <button type="button" id="btn-add-sub-entity" class="membership-btn membership-btn-outline membership-btn-sm">
+          <span aria-hidden="true">➕</span> إضافة فرع جديد
+        </button>
+        <button type="button" id="btn-save-sub-entity" class="membership-btn membership-btn-accent membership-btn-sm">حفظ الفرع</button>
+        <button type="button" id="btn-cancel-sub-entity" class="membership-btn membership-btn-outline membership-btn-sm" hidden>إلغاء التعديل</button>
+      </div>
+
+      <!-- جدول الفروع التابعة -->
+      <div class="members-table-wrapper" style="margin-top:1rem">
+        <table class="members-table">
+          <thead>
+            <tr>
+              <th scope="col">الاسم</th>
+              <th scope="col">الرمز</th>
+              <th scope="col">الحالة</th>
+              <th scope="col" class="members-th-actions">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody id="sub-entities-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="membership-modal-footer">
+      <button type="button" class="membership-btn membership-btn-outline" data-close-sub-entities-modal>إغلاق</button>
+    </div>
+  </div>
+</div>
 
         <section id="tab-subscriptions" class="tab-panel mx-auto hidden max-w-7xl">
 
