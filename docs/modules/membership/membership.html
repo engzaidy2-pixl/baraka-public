@@ -397,7 +397,7 @@
 
                     <div class="member-field">
                       <label class="membership-label" for="member-number-input">رقم العضوية</label>
-                      <input type="text" id="member-number-input" class="membership-input" placeholder="يُولَّد تلقائيًا" autocomplete="off">
+                      <input type="text" id="member-number-input" class="membership-input" placeholder="يُولّد تلقائياً (M-00001)" autocomplete="off">
                     </div>
 
                     <div class="member-field">
@@ -1376,14 +1376,8 @@
 
                     <div class="member-field">
                       <label class="membership-label" for="batch-year">السنة <span class="required">*</span></label>
+                      <!-- C3: الخيارات تُملأ ديناميكيًا عبر fillBatchYearOptions() = السنة الحالية ± 3 -->
                       <select id="batch-year" class="membership-input">
-                        <option value="2026">2026</option>
-                        <option value="2025">2025</option>
-                        <option value="2024">2024</option>
-                        <option value="2023">2023</option>
-                        <option value="2022">2022</option>
-                        <option value="2021">2021</option>
-                        <option value="2020">2020</option>
                       </select>
                     </div>
 

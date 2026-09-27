@@ -243,12 +243,13 @@
      ربط الإجراءات السريعة في لوحة التحكم
      ═══════════════════════════════════════════════ */
   function bindQuickActions() {
+    /* C1: ربط الإجراءات السريعة بالدوال الفعلية بدل رسائل «قيد الإنشاء» */
     const QUICK_ACTIONS = {
-      'add-member':        { tab: 'members',       msg: 'انتقلت إلى الأعضاء — نموذج الإضافة قيد الإنشاء' },
-      'view-members':      { tab: 'members',       msg: null },
-      'add-subscription':  { tab: 'subscriptions', msg: 'انتقلت إلى الاشتراكات — التسجيل قيد الإنشاء' },
-      'new-batch':         { tab: 'deductions',    msg: 'انتقلت إلى دفعات الخصم — التوليد قيد الإنشاء' },
-      'view-reports':      { tab: 'reports',       msg: null },
+      'add-member':        { tab: 'members',       handler: () => openMemberModal(null) },
+      'view-members':      { tab: 'members',       handler: null },
+      'add-subscription':  { tab: 'subscriptions', handler: () => openSubModal(null) },
+      'new-batch':         { tab: 'deductions',    handler: () => openBulkBatchModal() },
+      'view-reports':      { tab: 'reports',       handler: null },
     };
 
     document.querySelectorAll('#tab-dashboard [data-action]').forEach((btn) => {
@@ -256,7 +257,10 @@
         const action = QUICK_ACTIONS[btn.dataset.action];
         if (!action) return;
         if (action.tab) showTab(action.tab);
-        if (action.msg && typeof toast === 'function') toast(action.msg, 'info');
+        /* requestAnimationFrame يضمن تنفيذ الـ handler بعد رسم التبويب الجديد في DOM */
+        if (typeof action.handler === 'function') {
+          requestAnimationFrame(() => { action.handler(); });
+        }
       });
     });
   }
@@ -1201,6 +1205,9 @@
   /* ═══════════════════════════════════════════════════
      الحزمة ب — Cascading: قائمة جهة الخصم التابعة لجهة العمل
      employer_id = X AND is_self = false AND status = 'active'
+     Schema v2.1 ✓: يقرأ has_deduction_entities من جهة العمل،
+     يتجاهل is_self === true عند عرض الفروع، ويعرض
+     «تلقائي (صف ذاتي)» عند الحاجة — لا تعديل مطلوب.
      ═══════════════════════════════════════════════════ */
   function fillMemberDeductionEntitySelect(employerId, presetEntityId) {
     const select   = document.getElementById('member-deduction-entity');
@@ -1213,12 +1220,13 @@
       ? (STATE.members.employers || []).find((e) => Number(e.id) === eid)
       : null;
 
-    /* الفروع التابعة: غير ذاتية ونشطة فقط */
+    /* الفروع التابعة: غير ذاتية ونشطة فقط (تجاهل is_self === true) */
     const branches = eid
       ? (STATE.members.deductionEntities || []).filter((d) =>
           Number(d.employer_id) === eid && !d.is_self && d.status === 'active')
       : [];
 
+    /* Schema v2.1: has_deduction_entities من كائن جهة العمل */
     const hasBranches = !!(employer && employer.has_deduction_entities);
     const showSelect  = !!(hasBranches && branches.length);
 
@@ -1708,6 +1716,8 @@
     employer:         ['جهة العمل', 'العمل', 'الجهة', 'employer'],
     deduction_entity: ['جهة الخصم', 'الخصم', 'deductionentity', 'deduction_entity'],
     service_status:   ['الحالة بالخدمة', 'الحالة الوظيفية', 'servicestatus'],
+    /* C9: طريقة التحصيل — مطابق لقيد CHECK (cash | salary_deduction | bank_transfer) */
+    collection_method:['طريقة التحصيل', 'التحصيل', 'طريقة الجمع', 'collection_method', 'collectionmethod'],
     status:           ['الحالة', 'حالة العضوية', 'status'],
     membership_date:  ['تاريخ العضوية', 'تاريخ الانتساب', 'membershipdate'],
   };
@@ -1800,6 +1810,29 @@
           : rawService.indexOf('اخر') !== -1 || rawService === 'other' ? 'other'
           : 'active';
 
+        /* C9: collection_method — إن وُجد في Excel يُطبَّع لقيم CHECK،
+           وإلا يُشتق من service_status (نفس منطق applyCollectionDefault) */
+        const rawCollection = normalizeHeader(get('collection_method'));
+        let collectionMethod;
+        if (rawCollection) {
+          if (rawCollection.indexOf('راتب') !== -1
+              || rawCollection === 'salary_deduction'
+              || rawCollection === 'salarydeduction') {
+            collectionMethod = 'salary_deduction';
+          } else if (rawCollection.indexOf('تحويل') !== -1
+              || rawCollection === 'bank_transfer'
+              || rawCollection === 'banktransfer') {
+            collectionMethod = 'bank_transfer';
+          } else if (rawCollection.indexOf('نقد') !== -1 || rawCollection === 'cash') {
+            collectionMethod = 'cash';
+          } else {
+            /* قيمة غير معروفة ← اشتقاق آمن من الحالة الوظيفية */
+            collectionMethod = serviceStatus === 'active' ? 'salary_deduction' : 'cash';
+          }
+        } else {
+          collectionMethod = serviceStatus === 'active' ? 'salary_deduction' : 'cash';
+        }
+
         payloads.push({
           full_name:          fullName,
           national_id:        nationalId || null,
@@ -1811,6 +1844,7 @@
           /* الحزمة ب */
           deduction_entity_id: deductionEntityId,
           service_status:     serviceStatus,
+          collection_method:  collectionMethod,
           status:             status,
           membership_date:    get('membership_date') || null,
         });
@@ -3686,7 +3720,7 @@
 
   const BATCH_SELECT = [
     'id', 'batch_number', 'period_year', 'period_month', 'deduction_entity_id',
-    'payment_method', 'total_members', 'total_amount', 'status', 'created_at',
+    'payment_method', 'total_members', 'total_amount', 'status', 'notes', 'created_at',
     'deduction_entities:deduction_entity_id ( id, name )',
   ].join(', ');
 
@@ -5000,6 +5034,30 @@
     }).join('');
   }
 
+  /* C3: توليد خيارات السنة ديناميكيًا = السنة الحالية ± 3 */
+  function fillBatchYearOptions(selectedYear) {
+    const select = document.getElementById('batch-year');
+    if (!select) return;
+
+    const current = new Date().getFullYear();
+    const selected = selectedYear != null && selectedYear !== ''
+      ? Number(selectedYear)
+      : current;
+
+    const years = [];
+    for (let y = current + 3; y >= current - 3; y--) years.push(y);
+
+    /* إن كانت السنة المحددة خارج النطاق (دفعة قديمة) أضفها للقائمة */
+    if (selected && years.indexOf(selected) === -1) {
+      years.push(selected);
+      years.sort((a, b) => b - a);
+    }
+
+    select.innerHTML = years.map((y) =>
+      '<option value="' + y + '"' + (y === selected ? ' selected' : '') + '>' + y + '</option>'
+    ).join('');
+  }
+
   async function openBatchModal(id, opts) {
     const modal = document.getElementById('batch-modal');
     if (!modal) return;
@@ -5021,10 +5079,14 @@
     await loadBatchEntitiesOptions();
 
     const now = new Date();
+    const yearVal = data ? data.period_year : now.getFullYear();
+
+    /* C3: تعبئة سنوات batch-year ديناميكيًا قبل ضبط القيمة */
+    fillBatchYearOptions(yearVal);
 
     setVal('batch-id', data ? data.id : '');
     setVal('batch-number', data ? data.batch_number || '' : '');
-    setVal('batch-year', data ? data.period_year : now.getFullYear());
+    setVal('batch-year', yearVal);
     setVal('batch-month', data ? data.period_month : now.getMonth() + 1);
     setVal('batch-method',
       data ? data.payment_method || 'salary_deduction' : 'salary_deduction');
@@ -5156,7 +5218,7 @@
       toast(message, 'error');
     };
 
-    const batchNumber = value('batch-number');
+    let batchNumber = value('batch-number');
     const year = Number(value('batch-year')) || 0;
     const month = Number(value('batch-month')) || 0;
     const method = value('batch-method');
@@ -5164,8 +5226,9 @@
     const status = value('batch-status') || 'draft';
     const notes = value('batch-notes');
 
-    if (!batchNumber || !year || !month || !method) {
-      fail('رقم الدفعة والسنة والشهر والنوع حقول إلزامية.');
+    /* C3: رقم الدفعة اختياري — يُولَّد تلقائيًا إن كان فارغًا */
+    if (!year || !month || !method) {
+      fail('السنة والشهر والنوع حقول إلزامية.');
       return;
     }
 
@@ -5174,17 +5237,27 @@
       return;
     }
 
-    const payload = {
-      batch_number: batchNumber,
-      period_year: year,
-      period_month: month,
-      payment_method: method,
-      deduction_entity_id: entityId,
-      status,
-      notes,
-    };
-
     try {
+      if (!batchNumber) {
+        const { data: existingRows, error: numErr } = await sb
+          .from('deduction_batches')
+          .select('batch_number')
+          .eq('period_year', year);
+        if (numErr) throw numErr;
+        const takenNumbers = (existingRows || []).map((r) => r.batch_number);
+        batchNumber = generateBatchNumber(year, month, 1, takenNumbers);
+      }
+
+      const payload = {
+        batch_number: batchNumber,
+        period_year: year,
+        period_month: month,
+        payment_method: method,
+        deduction_entity_id: entityId,
+        status,
+        notes,
+      };
+
       let result;
 
       if (BATCH_EDIT.id) {
